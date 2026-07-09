@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Poznámky Widget</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    height: 100%;
+  }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0;
+    margin: 0;
+  }
+
+  .notes-card {
+    width: 100%;
+    height: 100%;
+    border-radius: 18px;
+    padding: 18px 20px;
+    position: relative;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .notes-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  /* Header */
+  .notes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  .notes-label {
+    font-size: 9px; letter-spacing: 3px; color: #f0d890;
+    text-transform: uppercase; font-family: var(--sans);
+    font-weight: 600; text-shadow: 0 0 8px rgba(240,216,80,0.4);
+  }
+  .notes-add-btn {
+    font-size: 11px; color: var(--text-dim); letter-spacing: 1px;
+    background: transparent; border: 1px solid rgba(200,160,60,0.2);
+    cursor: pointer; font-family: var(--mono);
+    padding: 4px 12px; border-radius: 4px; transition: all 0.15s;
+  }
+  .notes-add-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* Kategorie slider */
+  .cat-slider {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px; flex-shrink: 0;
+  }
+  .cat-arrow {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(200,160,60,0.25);
+    color: rgba(200,160,60,0.6);
+    width: 24px; height: 32px; border-radius: 6px;
+    cursor: pointer; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .cat-arrow:hover { border-color: var(--gold); color: var(--gold); }
+  .cat-current {
+    flex: 1; min-width: 0; background: rgba(0,0,0,0.4);
+    border: 1px solid var(--gold); border-radius: 8px;
+    padding: 6px 12px; display: flex;
+    align-items: center; justify-content: space-between;
+  }
+  .cat-name {
+    font-family: var(--sans); font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 1px;
+    flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
+  .cat-count { background: var(--gold); color: #000; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 8px; font-family: var(--sans); flex-shrink: 0; margin-left: 6px; }
+  .cat-del-btn { background: transparent; border: none; color: rgba(192,64,64,0.4); font-size: 11px; cursor: pointer; padding: 0 2px; transition: color 0.15s; margin-left: 6px; }
+  .cat-del-btn:hover { color: #c04040; }
+  .cat-dots { display: flex; justify-content: center; gap: 5px; margin-bottom: 10px; flex-shrink: 0; }
+  .cat-dot { width: 5px; height: 5px; border-radius: 50%; background: rgba(200,160,60,0.2); transition: all 0.2s; }
+  .cat-dot.active { background: var(--gold); width: 14px; border-radius: 3px; }
+  .cat-add-inline {
+    background: transparent; border: 1px dashed rgba(200,160,60,0.2);
+    color: var(--text-dim); font-size: 10px; width: 24px; height: 32px;
+    border-radius: 6px; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0; transition: all 0.15s;
+  }
+  .cat-add-inline:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* Nová kategorie */
+  .cat-new-row { display: none; align-items: center; gap: 6px; margin-bottom: 8px; flex-shrink: 0; }
+  .cat-new-row.open { display: flex; }
+  .cat-new-input {
+    flex: 1; background: rgba(200,160,60,0.06);
+    border: none; border-bottom: 1px solid var(--gold-dim);
+    color: var(--gold-text); font-family: var(--mono);
+    font-size: 10px; padding: 3px 6px; outline: none;
+  }
+  .cat-new-input::placeholder { color: var(--text-dim); }
+  .cat-new-ok { background: rgba(200,160,60,0.15); border: 1px solid var(--gold-dim); color: var(--gold); font-family: var(--mono); font-size: 9px; padding: 3px 8px; border-radius: 3px; cursor: pointer; }
+
+  /* Seznam poznámek */
+  .notes-list {
+    flex: 1; overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(200,160,60,0.2) transparent;
+  }
+
+  /* Poznámka */
+  .note-item {
+    padding: 8px 10px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    border: 1px solid rgba(200,160,60,0.1);
+    position: relative;
+    transition: background 0.15s, border-color 0.15s;
+    cursor: pointer;
+  }
+  .note-item:hover { background: rgba(200,160,60,0.04); border-color: rgba(200,160,60,0.2); }
+  .note-item.pinned { border-color: rgba(200,160,60,0.35); background: rgba(200,160,60,0.05); }
+
+  /* Barevný proužek vlevo */
+  .note-bar {
+    position: absolute; left: 0; top: 6px; bottom: 6px;
+    width: 3px; border-radius: 0 2px 2px 0;
+  }
+
+  .note-header { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px; padding-left: 10px; }
+  .note-pin-icon { font-size: 10px; flex-shrink: 0; margin-top: 1px; opacity: 0.7; }
+  .note-text {
+    flex: 1; font-size: 11px; font-family: var(--mono); color: var(--gold-text);
+    line-height: 1.5; white-space: pre-wrap;
+    word-break: break-word;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .note-item.expanded .note-text { -webkit-line-clamp: unset; }
+  .note-link {
+    color: var(--gold, #c8a03c); text-decoration: underline;
+    text-decoration-color: rgba(200,160,60,0.4);
+    transition: color 0.15s;
+  }
+  .note-link:hover { color: var(--gold-text, #e8d9b0); }
+  .note-link-title {
+    font-family: var(--sans); font-weight: 600; font-size: 12px;
+  }
+  .note-link-url {
+    font-size: 9px; color: var(--text-dim); margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .note-footer { display: flex; justify-content: space-between; align-items: center; padding-left: 10px; margin-top: 4px; }
+  .note-date { font-size: 11px; font-family: var(--mono); color: var(--text-dim); letter-spacing: 0.5px; }
+  .note-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
+  .note-item:hover .note-actions { opacity: 1; }
+  .note-btn {
+    background: transparent; border: none; font-size: 10px;
+    cursor: pointer; color: var(--text-dim); padding: 2px 4px;
+    border-radius: 3px; transition: color 0.15s;
+  }
+  .note-btn:hover { color: var(--gold); }
+  .note-btn.del:hover { color: #c04040; }
+  .note-btn.pin.active { color: var(--gold); }
+
+  .notes-empty { font-size: 10px; color: var(--text-dim); padding: 20px 0; text-align: center; letter-spacing: 1px; }
+
+  /* Formulář */
+  .notes-form {
+    display: none; flex-shrink: 0;
+    border-top: 1px solid rgba(200,160,60,0.1);
+    padding-top: 12px; flex-direction: column; gap: 8px;
+  }
+  .notes-form.open { display: flex; }
+  .notes-form-title { font-size: 9px; letter-spacing: 2px; color: var(--gold); text-transform: uppercase; font-family: var(--sans); }
+  .notes-textarea {
+    resize: none; height: 80px;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(200,160,60,0.15);
+    border-radius: 6px; padding: 8px 10px;
+    color: var(--gold-text); font-family: var(--mono);
+    font-size: 11px; line-height: 1.6; outline: none;
+    transition: border-color 0.2s;
+    scrollbar-width: thin;
+  }
+  .notes-textarea:focus { border-color: rgba(200,160,60,0.3); }
+  .notes-textarea::placeholder { color: var(--text-dim); font-style: italic; }
+  .notes-link-input {
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(200,160,60,0.15);
+    border-radius: 6px; padding: 8px 10px;
+    color: var(--gold-text); font-family: var(--mono);
+    font-size: 11px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .notes-link-input:focus { border-color: rgba(200,160,60,0.3); }
+  .notes-link-input::placeholder { color: var(--text-dim); font-style: italic; }
+  .notes-form-row { display: flex; gap: 8px; align-items: center; }
+  .notes-color-label { font-size: 9px; color: var(--text-dim); letter-spacing: 1px; }
+  .color-picker { display: flex; gap: 6px; }
+  .color-dot {
+    width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: all 0.15s;
+  }
+  .color-dot:hover { transform: scale(1.15); }
+  .color-dot.selected { border-color: #fff; transform: scale(1.1); }
+  .notes-form-btns { display: flex; gap: 6px; justify-content: flex-end; }
+  .notes-form-save {
+    background: rgba(200,160,60,0.12); border: 1px solid var(--gold-dim);
+    color: var(--gold); font-family: var(--mono); font-size: 9px;
+    padding: 4px 12px; border-radius: 4px; cursor: pointer;
+  }
+  .notes-form-save:hover { background: rgba(200,160,60,0.22); }
+  .notes-form-cancel { background: transparent; border: none; color: var(--text-dim); font-family: var(--mono); font-size: 9px; cursor: pointer; padding: 4px 8px; }
+</style>
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+</head>
+<body>
+
+<div class="notes-card">
+  <div class="notes-header">
+    <div class="notes-label" data-i18n="notes.title">Poznámky</div>
+    <button class="notes-add-btn" id="notes-add-btn" data-i18n="notes.addNew">+ nová</button>
+  </div>
+
+  <div class="cat-slider">
+    <button class="cat-arrow" id="cat-prev">‹</button>
+    <div class="cat-current" id="cat-current">
+      <span class="cat-name" id="cat-name" data-i18n="common.all">Vše</span>
+      <span class="cat-count" id="cat-count">0</span>
+    </div>
+    <button class="cat-arrow" id="cat-next">›</button>
+    <button class="cat-add-inline" id="cat-add-inline" title="Přidat kategorii" data-i18n-title="common.addCategory">+</button>
+  </div>
+  <div class="cat-dots" id="cat-dots"></div>
+  <div class="cat-new-row" id="cat-new-row">
+    <input class="cat-new-input" id="cat-new-input" placeholder="název kategorie..." data-i18n-placeholder="common.categoryNamePlaceholder">
+    <button class="cat-new-ok" id="cat-new-ok">+ <span data-i18n="common.add">přidat</span></button>
+  </div>
+
+  <div class="notes-list" id="notes-list"></div>
+
+  <div class="notes-form" id="notes-form">
+    <div class="notes-form-title" id="notes-form-title">Nová poznámka</div>
+    <textarea class="notes-textarea" id="notes-textarea" placeholder="Napiš poznámku..." data-i18n-placeholder="notes.notePlaceholder"></textarea>
+    <input type="text" id="notes-link-name" class="notes-link-input" placeholder="Název odkazu..." data-i18n-placeholder="notes.linkNamePlaceholder" style="display:none;">
+    <input type="text" id="notes-link-url" class="notes-link-input" placeholder="https://..." data-i18n-placeholder="notes.linkUrlPlaceholder" style="display:none;">
+    <div class="notes-form-row">
+      <span class="notes-color-label" data-i18n="notes.colorLabel">Barva:</span>
+      <div class="color-picker" id="color-picker"></div>
+    </div>
+    <div class="notes-form-row" id="notes-photo-row">
+      <span class="notes-color-label" data-i18n="notes.photoLabel">Foto:</span>
+      <input type="file" id="notes-photo" accept="image/*" style="font-size:9px;color:var(--text-dim);flex:1;">
+    </div>
+    <div class="notes-form-btns">
+      <button class="notes-form-cancel" id="notes-form-cancel" data-i18n="common.cancel">zrušit</button>
+      <button class="notes-form-save" id="notes-form-save" data-i18n="common.save">Uložit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'ks-notes';
+
+const COLORS = [
+  '#c8a03c', // zlatá
+  '#1faa77', // zelená
+  '#4a7aff', // modrá
+  '#e03020', // červená
+  '#9060f0', // fialová
+  '#ff9020', // oranžová
+  '#ffffff',  // bílá
+];
+
+const DEFAULT_CATS = [
+  { id: 'obecne', name: 'Obecné' },
+  { id: 'prace',  name: 'Práce' },
+  { id: 'osobni', name: 'Osobní' },
+  { id: 'vyvojar', name: 'Vývojář' },
+  { id: 'odkazy', name: 'Odkazy' },
+];
+
+// Výchozí kategorie se překládají podle aktuálního jazyka; vlastní kategorie ne.
+const DEFAULT_CAT_LABEL_KEYS = {
+  obecne: 'notes.categories.general',
+  prace:  'notes.categories.work',
+  osobni: 'notes.categories.personal',
+  vyvojar: 'notes.categories.developer',
+  odkazy: 'notes.categories.links',
+};
+function catLabel(cat) {
+  const key = DEFAULT_CAT_LABEL_KEYS[cat.id];
+  return key ? ksT(key, cat.name) : cat.name;
+}
+
+let data = { categories: [], notes: [] };
+let activeCatIdx = 0;
+let editingId    = null;
+let selectedColor = COLORS[0];
+
+function load() {
+  try { data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || { categories: [], notes: [] }; }
+  catch { data = { categories: [], notes: [] }; }
+  if (!data.categories.length) {
+    data.categories = DEFAULT_CATS;
+    data.notes = [
+      {
+        id: 'n_demo', cat: 'obecne', text: ksT('notes.sampleNote', '📌 Tuto poznámku lze připnout — bude vždy nahoře.\n\nKaždá poznámka má vlastní barvu. Kategorie si přejmenuj nebo přidej nové.'), color: '#c8a03c', pinned: true,
+        created: new Date().toISOString().slice(0,10)
+      }
+    ];
+    save();
+  } else if (!data.categories.some(c => c.id === 'odkazy')) {
+    // Appka už předtím běžela bez kategorie "Odkazy" — doplníme ji dodatečně, ať ji mají i stávající uživatelé.
+    data.categories.push({ id: 'odkazy', name: 'Odkazy' });
+    save();
+  }
+}
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); try { localStorage.setItem('ks-mob-notes', JSON.stringify({ count: data.notes.length })); } catch {} }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Najde v (už escapovaném) textu webové adresy (http/https) a udělá z nich klikací odkazy,
+// které se otevřou v nové záložce.
+function linkifyText(escapedText) {
+  return escapedText.replace(/(https?:\/\/[^\s<]+)/g, (url) => {
+    // Odsekni případnou koncovou interpunkci, ať se nepřilepí k odkazu (např. tečka na konci věty)
+    let clean = url, trail = '';
+    const m = clean.match(/([.,;:!?)]+)$/);
+    if (m) { trail = m[1]; clean = clean.slice(0, -trail.length); }
+    return `<a href="${clean}" target="_blank" rel="noopener" class="note-link">${clean}</a>${trail}`;
+  });
+}
+function fmtDate(str) { const [y,m,d]=str.split('-'); return `${d}.${m}.${y}`; }
+
+// ── KATEGORIE ──
+function getCatList() { return [{ id: 'all', name: ksT('common.all', 'Vše') }, ...data.categories]; }
+
+function renderCats() {
+  const list = getCatList();
+  if (activeCatIdx >= list.length) activeCatIdx = 0;
+  const cur   = list[activeCatIdx];
+  const count = cur.id === 'all' ? data.notes.length : data.notes.filter(n => n.cat === cur.id).length;
+
+  document.getElementById('cat-name').textContent  = catLabel(cur);
+  document.getElementById('cat-count').textContent = count;
+  document.getElementById('cat-prev').disabled = false;
+  document.getElementById('cat-next').disabled = false;
+
+  document.getElementById('cat-dots').innerHTML = list.map((c,i) =>
+    `<div class="cat-dot ${i===activeCatIdx?'active':''}"></div>`).join('');
+
+  const curDiv = document.getElementById('cat-current');
+  let delBtn = curDiv.querySelector('.cat-del-btn');
+  if (delBtn) delBtn.remove();
+  if (cur.id !== 'all' && cur.id !== 'vyvojar' && cur.id !== 'odkazy') {
+    delBtn = document.createElement('button');
+    delBtn.className = 'cat-del-btn'; delBtn.title = ksT('common.deleteCategory', 'Smazat kategorii'); delBtn.textContent = '✕';
+    delBtn.onclick = () => {
+      if (data.notes.some(n => n.cat === cur.id)) {
+        if (!confirm(ksT('notes.confirmDeleteCategory', 'Kategorie obsahuje poznámky — smazat?'))) return;
+        data.notes = data.notes.filter(n => n.cat !== cur.id);
+      }
+      data.categories = data.categories.filter(c => c.id !== cur.id);
+      activeCatIdx = 0; save(); renderCats(); renderNotes();
+    };
+    document.getElementById('cat-count').after(delBtn);
+  }
+}
+
+document.getElementById('cat-prev').addEventListener('click', () => {
+  const list = getCatList();
+  activeCatIdx = (activeCatIdx - 1 + list.length) % list.length;
+  renderCats(); renderNotes();
+});
+document.getElementById('cat-next').addEventListener('click', () => {
+  const list = getCatList();
+  activeCatIdx = (activeCatIdx + 1) % list.length;
+  renderCats(); renderNotes();
+});
+document.getElementById('cat-add-inline').addEventListener('click', () => {
+  const row = document.getElementById('cat-new-row');
+  row.classList.toggle('open');
+  if (row.classList.contains('open')) document.getElementById('cat-new-input').focus();
+});
+document.getElementById('cat-new-ok').addEventListener('click', addCat);
+document.getElementById('cat-new-input').addEventListener('keydown', e => { if(e.key==='Enter') addCat(); });
+function addCat() {
+  const input = document.getElementById('cat-new-input');
+  const name = input.value.trim(); if (!name) return;
+  data.categories.push({ id: 'cat_' + Date.now(), name });
+  input.value = ''; document.getElementById('cat-new-row').classList.remove('open');
+  save(); renderCats(); renderNotes();
+}
+
+// ── POZNÁMKY ──
+// Systémové poznámky (od announcements.js) mají textByLang místo pevného textu —
+// zobrazí se vždy v aktuálním jazyce, ne v tom, ve kterém vznikly.
+function noteDisplayText(n) {
+  if (!n.textByLang) return n.text || '';
+  const lang = (typeof ksResolveLang === 'function' && typeof ksGetLangPref === 'function')
+    ? ksResolveLang(ksGetLangPref()) : 'cz';
+  let t = n.textByLang[lang] || n.textByLang.cz || '';
+  if (n.announceType === 'update') {
+    const url = new URL('changelog.html', window.location.href).href;
+    t += `\n\n${ksT('changelog.moreInfo','Více info')}: ${url}`;
+  }
+  return t;
+}
+
+function renderNotes() {
+  const list = document.getElementById('notes-list');
+  const cats = getCatList();
+  const cur  = cats[activeCatIdx];
+  let notes  = cur.id === 'all' ? [...data.notes] : data.notes.filter(n => n.cat === cur.id);
+
+  // Seřadit: pinned nahoře, pak podle data
+  notes.sort((a,b) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return (b.created || '').localeCompare(a.created || '');
+  });
+
+  if (!notes.length) {
+    list.innerHTML = `<div class="notes-empty">${ksT('common.empty', '// žádné poznámky')}</div>`;
+    return;
+  }
+
+  list.innerHTML = notes.map(n => {
+    const isLink = n.cat === 'odkazy';
+    const textHtml = isLink
+      ? `<a href="${n.url}" target="_blank" rel="noopener" class="note-link-title note-link">🔗 ${escHtml(n.name)}</a><div class="note-link-url">${escHtml(n.url)}</div>`
+      : linkifyText(escHtml(noteDisplayText(n)));
+    return `
+    <div class="note-item ${n.pinned?'pinned':''}" data-id="${n.id}">
+      <div class="note-bar" style="background:${n.color};box-shadow:0 0 6px ${n.color}44;"></div>
+      <div class="note-header">
+        ${n.pinned ? '<span class="note-pin-icon">📌</span>' : ''}
+        <div class="note-text">${textHtml}</div>
+      </div>
+      ${n.photo ? `<div class="note-photo" style="padding-left:10px;margin-top:5px;display:none;">
+        <img src="${n.photo}" style="max-width:100%;max-height:120px;border-radius:6px;object-fit:cover;" alt="foto">
+      </div>` : ''}
+      <div class="note-footer">
+        <span class="note-date">${fmtDate(n.created)}</span>
+        <div class="note-actions">
+          <button class="note-btn pin ${n.pinned?'active':''}" data-pin="${n.id}" title="${n.pinned ? ksT('notes.unpin','Odepnout') : ksT('notes.pin','Připnout')}">📌</button>
+          ${n.textByLang ? '' : `<button class="note-btn" data-edit="${n.id}" title="${ksT('common.edit','Editovat')}">✎</button>`}
+          <button class="note-btn del" data-del="${n.id}" title="${ksT('common.delete','Smazat')}">✕</button>
+        </div>
+      </div>
+    </div>
+  `;
+  }).join('');
+
+  // Klik na text = rozbalit/sbalit (ale ne když kliknu na odkaz nebo tlačítko)
+  list.querySelectorAll('.note-item').forEach(item => {
+    item.addEventListener('click', e => {
+      if (e.target.closest('.note-btn') || e.target.closest('.note-link')) return;
+      item.classList.toggle('expanded');
+    });
+  });
+
+  list.querySelectorAll('[data-pin]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const n = data.notes.find(x => x.id === btn.dataset.pin);
+      if (n) { n.pinned = !n.pinned; save(); renderNotes(); }
+    });
+  });
+  list.querySelectorAll('[data-edit]').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openEdit(btn.dataset.edit); });
+  });
+  list.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      data.notes = data.notes.filter(n => n.id !== btn.dataset.del);
+      save(); renderCats(); renderNotes();
+    });
+  });
+}
+
+// ── FORMULÁŘ ──
+function buildColorPicker() {
+  const picker = document.getElementById('color-picker');
+  picker.innerHTML = COLORS.map(c =>
+    `<div class="color-dot ${c===selectedColor?'selected':''}" data-color="${c}" style="background:${c};"></div>`
+  ).join('');
+  picker.querySelectorAll('.color-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      selectedColor = dot.dataset.color;
+      picker.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
+      dot.classList.add('selected');
+    });
+  });
+}
+
+function isAddingToLinks() {
+  const cats = getCatList();
+  const activeCat = cats[activeCatIdx];
+  return activeCat && activeCat.id === 'odkazy';
+}
+
+function toggleLinkFormFields(isLink) {
+  document.getElementById('notes-textarea').style.display = isLink ? 'none' : '';
+  document.getElementById('notes-link-name').style.display = isLink ? '' : 'none';
+  document.getElementById('notes-link-url').style.display = isLink ? '' : 'none';
+  document.getElementById('notes-photo-row').style.display = isLink ? 'none' : '';
+}
+
+function openAdd() {
+  editingId = null;
+  const linkMode = isAddingToLinks();
+  document.getElementById('notes-form-title').textContent = linkMode ? ksT('notes.newLink', 'Nový odkaz') : ksT('notes.newNote', 'Nová poznámka');
+  document.getElementById('notes-textarea').value = '';
+  document.getElementById('notes-link-name').value = '';
+  document.getElementById('notes-link-url').value = '';
+  document.getElementById('notes-photo').value = '';
+  toggleLinkFormFields(linkMode);
+  selectedColor = COLORS[0];
+  buildColorPicker();
+  document.getElementById('notes-form').classList.add('open');
+  if (linkMode) document.getElementById('notes-link-name').focus();
+  else document.getElementById('notes-textarea').focus();
+}
+
+function openEdit(id) {
+  const n = data.notes.find(x => x.id === id);
+  if (!n) return;
+  editingId = id;
+  const linkMode = n.cat === 'odkazy';
+  document.getElementById('notes-form-title').textContent = linkMode ? ksT('notes.editLink', 'Upravit odkaz') : ksT('notes.editNote', 'Upravit poznámku');
+  toggleLinkFormFields(linkMode);
+  if (linkMode) {
+    document.getElementById('notes-link-name').value = n.name || '';
+    document.getElementById('notes-link-url').value = n.url || '';
+  } else {
+    document.getElementById('notes-textarea').value = n.text || '';
+  }
+  selectedColor = n.color || COLORS[0];
+  buildColorPicker();
+  document.getElementById('notes-form').classList.add('open');
+}
+
+function closeForm() {
+  document.getElementById('notes-form').classList.remove('open');
+  editingId = null;
+}
+
+document.getElementById('notes-add-btn').addEventListener('click', openAdd);
+document.getElementById('notes-form-cancel').addEventListener('click', closeForm);
+
+document.getElementById('notes-form-save').addEventListener('click', () => {
+  const cats = getCatList();
+  const cat  = cats[activeCatIdx].id === 'all' ? (data.categories[0]?.id || 'obecne') : cats[activeCatIdx].id;
+  const editingNote = editingId ? data.notes.find(x => x.id === editingId) : null;
+  const linkMode = editingNote ? editingNote.cat === 'odkazy' : isAddingToLinks();
+
+  if (linkMode) {
+    const name = document.getElementById('notes-link-name').value.trim();
+    let url = document.getElementById('notes-link-url').value.trim();
+    if (!name || !url) return;
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    if (editingId) {
+      if (editingNote) { editingNote.name = name; editingNote.url = url; editingNote.color = selectedColor; }
+    } else {
+      data.notes.push({
+        id: 'n_' + Date.now(), cat: 'odkazy', name, url,
+        color: selectedColor, pinned: false,
+        created: new Date().toISOString().slice(0,10)
+      });
+    }
+    save(); closeForm(); renderCats(); renderNotes();
+    return;
+  }
+
+  const text = document.getElementById('notes-textarea').value.trim();
+  if (!text) return;
+
+  const photoFile = document.getElementById('notes-photo').files[0];
+  const doSave = (photo) => {
+    if (editingId) {
+      const n = data.notes.find(x => x.id === editingId);
+      if (n) { n.text = text; n.color = selectedColor; if (photo) n.photo = photo; }
+    } else {
+      data.notes.push({
+        id: 'n_' + Date.now(), cat, text,
+        color: selectedColor, pinned: false, photo: photo || null,
+        created: new Date().toISOString().slice(0,10)
+      });
+    }
+    save(); closeForm(); renderCats(); renderNotes();
+  };
+  if (photoFile) {
+    const r = new FileReader();
+    r.onload = () => doSave(r.result);
+    r.readAsDataURL(photoFile);
+  } else { doSave(null); }
+});
+
+// ── INIT ──
+load(); try { localStorage.setItem('ks-mob-notes', JSON.stringify({ count: data.notes.length })); } catch {} renderCats(); renderNotes(); buildColorPicker();
+
+// Když se přepne jazyk, překresli texty
+window.addEventListener('ks-lang-applied', () => { renderCats(); renderNotes(); });
+
+// Když se poznámky změní odjinud (např. announcements.js vloží novou poznámku
+// o aktualizaci z hlavní stránky), načti je znovu a překresli.
+window.addEventListener('storage', (e) => {
+  if (e.key === STORAGE_KEY) { load(); renderCats(); renderNotes(); }
+});
+</script>
+</body>
+</html>

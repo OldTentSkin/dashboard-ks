@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Agenda Widget</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    height: 100%;
+  }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0;
+    margin: 0;
+  }
+
+  .agenda-card {
+    width: 100%;
+    height: 100%;
+    border-radius: 18px;
+    padding: 18px 20px;
+    position: relative;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .agenda-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  /* Header */
+  .agenda-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-shrink: 0;
+  }
+  .agenda-label {
+    font-size: 9px; letter-spacing: 3px; color: #f0d890;
+    text-transform: uppercase; font-family: var(--sans);
+    font-weight: 600; text-shadow: 0 0 8px rgba(240,216,80,0.4);
+  }
+  .agenda-today-date {
+    font-size: 10px; color: var(--gold-text);
+    opacity: 0.5; letter-spacing: 1px; font-family: var(--sans);
+  }
+
+  /* Scrollovatelný obsah */
+  .agenda-body {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(200,160,60,0.2) transparent;
+    padding-right: 2px;
+  }
+
+  /* Den sekce */
+  .agenda-day-section { margin-bottom: 14px; }
+  .agenda-day-label {
+    font-size: 8px; letter-spacing: 3px; color: var(--gold);
+    text-transform: uppercase; font-family: var(--sans);
+    font-weight: 700; margin-bottom: 6px; padding-bottom: 4px;
+    border-bottom: 1px solid rgba(200,160,60,0.12);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .agenda-day-date { font-size: 8px; color: var(--gold-text); opacity: 0.5; font-weight: 400; letter-spacing: 1px; }
+
+  /* Událost */
+  .agenda-event {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(200,160,60,0.06);
+    align-items: flex-start;
+    position: relative;
+  }
+  .agenda-event:last-child { border-bottom: none; }
+  .agenda-event:hover { background: rgba(200,160,60,0.03); border-radius: 4px; }
+
+  .agenda-bar {
+    width: 3px; border-radius: 2px;
+    align-self: stretch; flex-shrink: 0;
+    min-height: 28px;
+  }
+  .agenda-time {
+    font-size: 11px; font-family: var(--mono); color: var(--gold-text);
+    opacity: 0.55; letter-spacing: 0.5px; flex-shrink: 0;
+    padding-top: 2px; min-width: 40px;
+  }
+  .agenda-info { flex: 1; min-width: 0; }
+  .agenda-title {
+    font-size: 13px; font-family: var(--mono); color: var(--gold-text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .agenda-source {
+    font-size: 10px; font-family: var(--mono); color: var(--gold-text);
+    opacity: 0.5; margin-top: 1px; letter-spacing: 0.5px;
+  }
+  .agenda-actions {
+    display: flex; gap: 3px;
+    opacity: 0; transition: opacity 0.15s; flex-shrink: 0;
+  }
+  .agenda-event:hover .agenda-actions { opacity: 1; }
+  .agenda-btn {
+    background: transparent; border: none; font-size: 10px;
+    cursor: pointer; color: var(--text-dim); padding: 1px 3px;
+    border-radius: 3px; transition: color 0.15s;
+  }
+  .agenda-btn:hover { color: var(--gold); }
+  .agenda-btn.del:hover { color: #c04040; }
+
+  /* Prázdný stav */
+  .agenda-empty {
+    font-size: 10px; color: var(--gold-text);
+    opacity: 0.45; padding: 6px 0 6px 13px; letter-spacing: 1px;
+  }
+
+  /* Přidat událost */
+  .agenda-add-section {
+    flex-shrink: 0;
+    padding-top: 10px;
+    border-top: 1px solid rgba(200,160,60,0.1);
+  }
+  .agenda-add-row {
+    display: flex; gap: 5px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .agenda-add-input {
+    flex: 1; min-width: 100px;
+    background: transparent; border: none;
+    border-bottom: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text); font-family: var(--mono); font-size: 10px;
+    padding: 3px 4px; outline: none; transition: border-color 0.2s;
+  }
+  .agenda-add-input:focus { border-color: var(--gold); }
+  .agenda-add-input::placeholder { color: var(--text-dim); }
+  .agenda-add-time {
+    width: 72px; background: transparent;
+    border: 1px solid rgba(200,160,60,0.2); color: var(--gold-text);
+    font-family: var(--mono); font-size: 10px;
+    padding: 3px 4px; border-radius: 3px; outline: none;
+    color-scheme: dark;
+  }
+  .agenda-add-day {
+    background: transparent; border: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text); font-family: var(--mono); font-size: 9px;
+    padding: 3px 5px; border-radius: 3px; cursor: pointer; outline: none;
+  }
+  .agenda-add-color {
+    width: 26px; height: 26px; border: none; border-radius: 4px;
+    cursor: pointer; padding: 2px; background: transparent;
+  }
+  .agenda-add-btn {
+    background: rgba(200,160,60,0.12); border: 1px solid var(--gold-dim);
+    color: var(--gold); font-family: var(--mono); font-size: 11px;
+    padding: 2px 10px; border-radius: 4px; cursor: pointer;
+  }
+  .agenda-add-btn:hover { background: rgba(200,160,60,0.22); }
+</style>
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+</head>
+<body>
+
+<div class="agenda-card">
+  <div class="agenda-header">
+    <div class="agenda-label" data-i18n="agenda.title">Agenda</div>
+    <div class="agenda-today-date" id="agenda-today-date">—</div>
+  </div>
+
+  <div class="agenda-body" id="agenda-body"></div>
+
+
+</div>
+
+<script>
+const STORAGE_KEY = 'ks-calendar';
+const GOOGLE_EVENTS_KEY = 'ks-google-events';
+function MONTHS() { return ksT('common.months', ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince']); }
+function DAYS()   { return ksT('common.days', ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota']); }
+
+let manualEvents = {};
+let icalEvents   = {};
+
+function load() {
+  try { manualEvents = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { manualEvents = {}; }
+}
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(manualEvents)); }
+
+function fmtDate(dt) {
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function getEvents(dateStr) {
+  const m = manualEvents[dateStr] || [];
+  const i = icalEvents[dateStr]   || [];
+  return [...m, ...i].sort((a,b) => (a.time||'99:99').localeCompare(b.time||'99:99'));
+}
+
+function render() {
+  const now      = new Date();
+  const today    = fmtDate(now);
+  const tomorrow = fmtDate(new Date(now.getTime() + 86400000));
+
+  document.getElementById('agenda-today-date').textContent =
+    `${now.getDate()}. ${MONTHS()[now.getMonth()]} ${now.getFullYear()}`;
+
+  const body = document.getElementById('agenda-body');
+  let html = '';
+
+  const dayAfter = fmtDate(new Date(now.getTime() + 2*86400000));
+  const weekDays = [];
+  for (let i = 3; i <= 7; i++) weekDays.push(fmtDate(new Date(now.getTime() + i*86400000)));
+
+  [[today, ksT('common.today','DNES'), now], [tomorrow, ksT('common.tomorrow','ZÍTRA'), new Date(now.getTime()+86400000)], [dayAfter, ksT('common.dayAfterTomorrow','POZÍTŘÍ'), new Date(now.getTime()+2*86400000)]].forEach(([dateStr, label, dt]) => {
+    const evs = getEvents(dateStr);
+    const dateLabel = `${dt.getDate()}. ${MONTHS()[dt.getMonth()]} · ${DAYS()[dt.getDay()]}`;
+
+    html += `<div class="agenda-day-section">
+      <div class="agenda-day-label">
+        <span>${label}</span>
+        <span class="agenda-day-date">${dateLabel}</span>
+      </div>`;
+
+    if (!evs.length) {
+      html += `<div class="agenda-empty">${ksT('agenda.noEvents', '// žádné události')}</div>`;
+    } else {
+      evs.forEach(ev => {
+        html += `<div class="agenda-event" data-date="${dateStr}" data-id="${ev.id}">
+          <div class="agenda-bar" style="background:${ev.color};box-shadow:0 0 6px ${ev.color}55;"></div>
+          <div class="agenda-time">${ev.time || '——'}</div>
+          <div class="agenda-info">
+            <div class="agenda-title">${escHtml(ev.title)}</div>
+            ${ev.ical ? `<div class="agenda-source">${ksT('agenda.source','Google')}</div>` : ''}
+          </div>
+          ${!ev.ical ? `<div class="agenda-actions">
+            <button class="agenda-btn del" data-del="${ev.id}" data-date="${dateStr}">✕</button>
+          </div>` : ''}
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  });
+
+  // Tento týden — zobrazit jen dny s událostmi
+  const weekDaysWithEvents = weekDays.filter(d => getEvents(d).length > 0);
+  if (weekDaysWithEvents.length > 0) {
+    html += `<div class="agenda-day-section"><div class="agenda-day-label"><span>${ksT('common.thisWeek','TENTO TÝDEN')}</span></div>`;
+    weekDaysWithEvents.forEach(dateStr => {
+      const dt2 = new Date(dateStr);
+      const dateLabel2 = `${dt2.getDate()}. ${MONTHS()[dt2.getMonth()]} · ${DAYS()[dt2.getDay()]}`;
+      html += `<div class="agenda-day-label" style="font-size:9px;margin-top:6px;border-bottom:none;"><span class="agenda-day-date">${dateLabel2}</span></div>`;
+      getEvents(dateStr).forEach(ev => {
+        html += `<div class="agenda-event">
+          <div class="agenda-bar" style="background:${ev.color};box-shadow:0 0 6px ${ev.color}55;"></div>
+          <div class="agenda-time">${ev.time || '——'}</div>
+          <div class="agenda-info"><div class="agenda-title">${escHtml(ev.title)}</div>${ev.ical ? `<div class="agenda-source">${ksT('agenda.source','Google')}</div>` : ''}</div>
+        </div>`;
+      });
+    });
+    html += `</div>`;
+  }
+
+  body.innerHTML = html;
+
+  // Smazat
+  body.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const dateStr = btn.dataset.date;
+      const id = btn.dataset.del;
+      if (!manualEvents[dateStr]) return;
+      manualEvents[dateStr] = manualEvents[dateStr].filter(e => e.id !== id);
+      if (!manualEvents[dateStr].length) delete manualEvents[dateStr];
+      save(); render();
+    });
+  });
+}
+
+
+
+// Google eventy — čteme jen z localStorage, kam je ukládá Kalendář widget (žádný OAuth zde)
+function loadGoogleEvents() {
+  try { icalEvents = JSON.parse(localStorage.getItem(GOOGLE_EVENTS_KEY) || '{}'); }
+  catch { icalEvents = {}; }
+}
+
+function writeMobSummary() {
+  try {
+    let count = 0;
+    Object.values(manualEvents).forEach(list => { count += (list || []).length; });
+    Object.values(icalEvents).forEach(list => { count += (list || []).length; });
+    localStorage.setItem('ks-mob-agenda', JSON.stringify({ count }));
+  } catch {}
+}
+
+// Reaguj na změnu v jiné záložce/iframe (např. po přihlášení v Kalendáři)
+window.addEventListener('storage', e => {
+  if (e.key === GOOGLE_EVENTS_KEY) { loadGoogleEvents(); render(); writeMobSummary(); }
+  if (e.key === STORAGE_KEY) { load(); render(); writeMobSummary(); }
+});
+
+load();
+loadGoogleEvents();
+render();
+writeMobSummary();
+
+// Když se přepne jazyk, překresli texty
+window.addEventListener('ks-lang-applied', render);
+</script>
+</body>
+</html>

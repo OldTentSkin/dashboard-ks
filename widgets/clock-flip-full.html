@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Flip Clock Widget</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    height: 100%;
+  }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0;
+    margin: 0;
+  }
+
+  .clock-card {
+    width: 100%;
+    height: 100%;
+    border-radius: 18px;
+    padding: 8px 12px;
+    position: relative;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .clock-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  /* HUD rohy */
+  .hud-corner { position: absolute; width: 12px; height: 12px; border-color: rgba(200,160,60,0.25); border-style: solid; }
+  .hud-tl { top: 10px; left: 10px; border-width: 1px 0 0 1px; border-radius: 3px 0 0 0; }
+  .hud-tr { top: 10px; right: 10px; border-width: 1px 1px 0 0; border-radius: 0 3px 0 0; }
+  .hud-bl { bottom: 10px; left: 10px; border-width: 0 0 1px 1px; border-radius: 0 0 0 3px; }
+  .hud-br { bottom: 10px; right: 10px; border-width: 0 1px 1px 0; border-radius: 0 0 3px 0; }
+
+  /* Přepínač */
+  .mode-tabs { display: flex; gap: 4px; margin-bottom: 12px; position: relative; z-index: 2; }
+  .mode-tab {
+    flex: 1; background: transparent;
+    border: 1px solid rgba(200,160,60,0.15);
+    color: var(--text-dim); font-family: var(--mono);
+    font-size: 8px; letter-spacing: 2px;
+    padding: 3px 4px; border-radius: 6px;
+    cursor: pointer; transition: all 0.2s; text-transform: uppercase;
+  }
+  .mode-tab:hover { border-color: var(--gold-dim); color: var(--gold-text); }
+  .mode-tab.active { background: rgba(200,160,60,0.12); border-color: var(--gold); color: var(--gold); }
+  body.ks-pinned .mode-tab { padding: 20px 6px; font-size: 11px; }
+
+  /* Panely */
+  .mode-panel { display: none; flex: 1; flex-direction: column; align-items: center; justify-content: center; }
+  .mode-panel.active { display: flex; }
+
+  /* ── FLIP DIGIT ── */
+  .flip-clock { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 8px; }
+  .flip-sep {
+    font-family: var(--sans); font-size: 36px; font-weight: 700;
+    color: var(--gold); line-height: 1; margin-bottom: 4px;
+    animation: blink 1s step-end infinite;
+    text-shadow: 0 0 10px rgba(200,160,60,0.5);
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.1} }
+  .flip-pair { display: flex; gap: 3px; }
+
+  .flip-digit { position: relative; width: clamp(22px, 4vh, 40px); height: clamp(30px, 5.5vh, 54px); perspective: 180px; }
+  .flip-card { position: absolute; width: 100%; overflow: hidden; background: #1a1408; }
+  .flip-card-top { top:0; height:50%; border-radius:5px 5px 0 0; border-bottom:1px solid rgba(0,0,0,0.7); display:flex; align-items:flex-end; justify-content:center; padding-bottom:1px; }
+  .flip-card-bot { bottom:0; height:50%; border-radius:0 0 5px 5px; display:flex; align-items:flex-start; justify-content:center; padding-top:1px; }
+  .flip-card span { font-family:var(--sans); font-size:36px; font-weight:700; color:var(--gold); text-shadow:0 0 8px rgba(200,160,60,0.4); line-height:1; display:block; user-select:none; }
+  .flip-card-top span { transform:translateY(50%); }
+  .flip-card-bot span { transform:translateY(-50%); }
+  .flip-digit::after { content:''; position:absolute; top:50%; left:0; right:0; height:1px; background:rgba(0,0,0,0.8); z-index:10; pointer-events:none; }
+
+  .flip-flap { position:absolute; width:100%; height:50%; overflow:hidden; transform-origin:bottom center; backface-visibility:hidden; }
+  .flip-flap-top { top:0; border-radius:5px 5px 0 0; background:#1a1408; display:flex; align-items:flex-end; justify-content:center; padding-bottom:1px; }
+  .flip-flap-top span { font-family:var(--sans); font-size:36px; font-weight:700; color:var(--gold); text-shadow:0 0 8px rgba(200,160,60,0.4); line-height:1; transform:translateY(50%); display:block; user-select:none; }
+  .flip-flap.animating { animation:flipDown 0.35s ease-in forwards; }
+  @keyframes flipDown { 0%{transform:rotateX(0)} 100%{transform:rotateX(-90deg)} }
+  .flip-flap-incoming { position:absolute; top:50%; width:100%; height:50%; overflow:hidden; transform-origin:top center; background:#1a1408; border-radius:0 0 5px 5px; display:flex; align-items:flex-start; justify-content:center; padding-top:1px; }
+  .flip-flap-incoming span { font-family:var(--sans); font-size:36px; font-weight:700; color:var(--gold); text-shadow:0 0 8px rgba(200,160,60,0.4); line-height:1; transform:translateY(-50%); display:block; user-select:none; }
+  .flip-flap-incoming.animating { animation:flipIn 0.35s ease-out 0.15s forwards; transform:rotateX(90deg); }
+  @keyframes flipIn { 0%{transform:rotateX(90deg)} 100%{transform:rotateX(0)} }
+
+  /* Datum + pozdrav pod flip hodinami */
+  .clock-info { text-align: center; margin-top: 4px; }
+  .clock-greeting { font-size: 10px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 3px; }
+  .clock-date-row { display: flex; justify-content: center; gap: 12px; }
+  .clock-date { font-size: 11px; color: var(--gold); letter-spacing: 2px; font-family: var(--sans); font-weight: 600; }
+  .clock-day  { font-size: 10px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; }
+
+  /* ── STATICKÝ DISPLAY (stopky + odpočet) ── */
+  .static-display {
+    font-family: var(--sans);
+    font-size: 50px; font-weight: 700;
+    background: linear-gradient(180deg, #ffe080 0%, #c8a03c 40%, #7a5a10 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.8)) drop-shadow(0 0 14px rgba(200,160,60,0.3));
+    letter-spacing: 3px; line-height: 1;
+    transform: perspective(200px) rotateX(6deg);
+    transform-origin: center bottom;
+    margin-bottom: 4px;
+  }
+  .static-display.done {
+    background: linear-gradient(180deg, #ff8080 0%, #c04040 40%, #7a1010 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    animation: pulse 0.5s ease-in-out infinite alternate;
+  }
+  @keyframes pulse { from{opacity:1} to{opacity:0.4} }
+  .static-sub { font-size: 11px; color: rgba(200,160,60,0.4); letter-spacing: 3px; margin-bottom: 14px; }
+  .static-label { font-size: 10px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 12px; }
+
+  /* Kola (stopky) */
+  .sw-laps {
+    width: 100%; max-height: 52px; overflow-y: auto; margin-bottom: 12px;
+    scrollbar-width: thin; scrollbar-color: rgba(200,160,60,0.2) transparent;
+  }
+  .sw-lap { display:flex; justify-content:space-between; font-size:10px; color:var(--text-dim); padding:2px 6px; border-bottom:1px solid rgba(200,160,60,0.06); }
+  .sw-lap:last-child { color: var(--gold-text); }
+
+  /* Nastavení odpočtu */
+  .cd-set { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+  .cd-set-group { display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .cd-set-label { font-size:8px; color:var(--text-dim); letter-spacing:1px; }
+  .cd-set-input {
+    width:44px; background:rgba(200,160,60,0.06);
+    border:1px solid rgba(200,160,60,0.2); color:var(--gold-text);
+    font-family:var(--sans); font-size:20px; font-weight:700;
+    text-align:center; padding:4px 0; border-radius:6px; outline:none;
+  }
+  .cd-set-input:focus { border-color:var(--gold); }
+  .cd-sep { font-family:var(--sans); font-size:20px; font-weight:700; color:var(--gold-dim); margin-top:12px; }
+
+  /* Tlačítka */
+  .btn-row { display:flex; gap:8px; width:100%; }
+  .btn {
+    flex:1; background:rgba(200,160,60,0.08); border:1px solid rgba(200,160,60,0.2);
+    color:var(--gold-text); font-family:var(--mono); font-size:9px; letter-spacing:2px;
+    padding:4px 4px; border-radius:8px; cursor:pointer; transition:all 0.15s; text-transform:uppercase;
+  }
+  .btn:hover { background:rgba(200,160,60,0.16); border-color:var(--gold); color:var(--gold); }
+  .btn.primary { background:rgba(200,160,60,0.18); border-color:var(--gold); color:var(--gold); }
+  .btn.danger  { border-color:rgba(192,64,64,0.3); color:rgba(192,64,64,0.7); }
+  .btn.danger:hover { background:rgba(192,64,64,0.1); border-color:#c04040; color:#c04040; }
+</style>
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+</head>
+<body>
+
+<div class="clock-card">
+  <div class="hud-corner hud-tl"></div>
+  <div class="hud-corner hud-tr"></div>
+  <div class="hud-corner hud-bl"></div>
+  <div class="hud-corner hud-br"></div>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="clock" data-i18n="clock.tabTime">⏰ Čas</button>
+    <button class="mode-tab" data-mode="stopwatch" data-i18n="clock.tabStopwatch">⏱ Stopky</button>
+    <button class="mode-tab" data-mode="countdown" data-i18n="clock.tabCountdown">⏳ Odpočet</button>
+  </div>
+
+  <!-- ── HODINY ── -->
+  <div class="mode-panel active" id="panel-clock">
+    <div class="flip-clock" id="flip-clock"></div>
+    <div class="clock-info">
+      <div class="clock-greeting" id="clock-greeting">—</div>
+      <div class="clock-date-row">
+        <div class="clock-date" id="clock-date">—</div>
+        <div class="clock-day"  id="clock-day">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STOPKY ── -->
+  <div class="mode-panel" id="panel-stopwatch">
+    <div class="static-display" id="sw-display">00:00</div>
+    <div class="static-sub" id="sw-ms">.00</div>
+    <div class="sw-laps" id="sw-laps"></div>
+    <div class="btn-row">
+      <button class="btn primary" id="sw-start">Start</button>
+      <button class="btn" id="sw-lap" data-i18n="clock.lap">Kolo</button>
+      <button class="btn danger" id="sw-reset" data-i18n="clock.reset">Reset</button>
+    </div>
+  </div>
+
+  <!-- ── ODPOČET ── -->
+  <div class="mode-panel" id="panel-countdown">
+    <div class="static-display" id="cd-display">00:00:00</div>
+    <div class="static-label" id="cd-label" data-i18n="clock.setTimeAndStart">nastav čas a spusť</div>
+    <div class="cd-set" id="cd-set">
+      <div class="cd-set-group"><div class="cd-set-label" data-i18n="clock.hoursLabel">HOD</div><input class="cd-set-input" id="cd-h" type="number" min="0" max="23" value="0"></div>
+      <div class="cd-sep">:</div>
+      <div class="cd-set-group"><div class="cd-set-label" data-i18n="clock.minutesLabel">MIN</div><input class="cd-set-input" id="cd-m" type="number" min="0" max="59" value="5"></div>
+      <div class="cd-sep">:</div>
+      <div class="cd-set-group"><div class="cd-set-label" data-i18n="clock.secondsLabel">SEK</div><input class="cd-set-input" id="cd-s" type="number" min="0" max="59" value="0"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" id="cd-start">Start</button>
+      <button class="btn danger"  id="cd-reset" data-i18n="clock.reset">Reset</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── PŘEPÍNAČ ──
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.mode).classList.add('active');
+  });
+});
+
+// ── FLIP DIGIT ──
+class FlipDigit {
+  constructor(container) {
+    this.current = null;
+    this.el = document.createElement('div'); this.el.className = 'flip-digit';
+    this.cardTop = this._card('flip-card flip-card-top');
+    this.cardBot = this._card('flip-card flip-card-bot');
+    this.flap = document.createElement('div'); this.flap.className = 'flip-flap flip-flap-top';
+    this.flapSpan = document.createElement('span'); this.flap.appendChild(this.flapSpan);
+    this.incoming = document.createElement('div'); this.incoming.className = 'flip-flap-incoming';
+    this.incomingSpan = document.createElement('span'); this.incoming.appendChild(this.incomingSpan);
+    this.el.append(this.cardTop, this.cardBot, this.flap, this.incoming);
+    container.appendChild(this.el);
+  }
+  _card(cls) { const c=document.createElement('div'); c.className=cls; c.appendChild(document.createElement('span')); return c; }
+  setValue(val, animate=false) {
+    if (val === this.current) return;
+    const prev = this.current; this.current = val;
+    if (!animate || prev===null) {
+      this.cardTop.querySelector('span').textContent = val;
+      this.cardBot.querySelector('span').textContent = val;
+      this.flapSpan.textContent = val; this.incomingSpan.textContent = val; return;
+    }
+    this.flapSpan.textContent = prev; this.incomingSpan.textContent = val;
+    this.cardTop.querySelector('span').textContent = val;
+    this.cardBot.querySelector('span').textContent = prev;
+    this.flap.classList.remove('animating'); this.incoming.classList.remove('animating');
+    void this.flap.offsetWidth;
+    this.flap.classList.add('animating'); this.incoming.classList.add('animating');
+    setTimeout(() => {
+      this.flap.classList.remove('animating'); this.incoming.classList.remove('animating');
+      this.cardBot.querySelector('span').textContent = val;
+      this.flapSpan.textContent = val;
+    }, 500);
+  }
+}
+
+class FlipClock {
+  constructor(container) {
+    this.digits = {};
+    const makeGroup = (a,b) => { const p=document.createElement('div'); p.className='flip-pair'; this.digits[a]=new FlipDigit(p); this.digits[b]=new FlipDigit(p); return p; };
+    const sep = () => { const s=document.createElement('div'); s.className='flip-sep'; s.textContent=':'; return s; };
+    container.append(makeGroup('h1','h2'), sep(), makeGroup('m1','m2'), sep(), makeGroup('s1','s2'));
+  }
+  update(animate=true) {
+    const now = new Date();
+    const h=String(now.getHours()).padStart(2,'0');
+    const m=String(now.getMinutes()).padStart(2,'0');
+    const s=String(now.getSeconds()).padStart(2,'0');
+    this.digits.h1.setValue(h[0],animate); this.digits.h2.setValue(h[1],animate);
+    this.digits.m1.setValue(m[0],animate); this.digits.m2.setValue(m[1],animate);
+    this.digits.s1.setValue(s[0],animate); this.digits.s2.setValue(s[1],animate);
+  }
+}
+
+function getGreeting(h) {
+  if(h>=5&&h<10) return ksT('clock.greetings.morning','Dobré ráno');
+  if(h>=10&&h<12) return ksT('clock.greetings.forenoon','Dopoledne');
+  if(h>=12&&h<14) return ksT('clock.greetings.noon','Dobré poledne');
+  if(h>=14&&h<18) return ksT('clock.greetings.afternoon','Dobré odpoledne');
+  if(h>=18&&h<22) return ksT('clock.greetings.evening','Dobrý večer');
+  return ksT('clock.greetings.night','Dobrou noc');
+}
+
+function updateClockInfo() {
+  const now = new Date();
+  document.getElementById('clock-greeting').textContent = getGreeting(now.getHours());
+  const days=ksT('common.days', ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota']);
+  const months=ksT('common.months', ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince']);
+  document.getElementById('clock-date').textContent = `${now.getDate()}. ${months[now.getMonth()]}`;
+  document.getElementById('clock-day').textContent = days[now.getDay()];
+}
+
+const flipClock = new FlipClock(document.getElementById('flip-clock'));
+flipClock.update(false);
+updateClockInfo();
+setInterval(() => { flipClock.update(true); updateClockInfo(); }, 1000);
+
+window.addEventListener('ks-lang-applied', () => { updateClockInfo(); });
+
+// Když je tahle dlaždice na dashboardu "připnutá" (zvětšená přes tlačítko Rozbalit),
+// zvětši záložky Čas/Stopky/Odpočet, ať se na počítači líp trefí myší.
+function ksSyncPinState() {
+  try {
+    const frame = window.frameElement;
+    if (!frame) return;
+    const tile = frame.closest('.tile, .flip-tile');
+    if (!tile) return;
+    document.body.classList.toggle('ks-pinned', tile.classList.contains('pinned'));
+  } catch (e) { /* ignorovat */ }
+}
+try {
+  const frame = window.frameElement;
+  const tile = frame && frame.closest('.tile, .flip-tile');
+  if (tile) {
+    ksSyncPinState();
+    new MutationObserver(ksSyncPinState).observe(tile, { attributes: true, attributeFilter: ['class'] });
+  }
+} catch (e) {}
+
+// ── STOPKY ──
+let swRunning=false, swStart=0, swElapsed=0, swInterval=null, swLaps=[];
+function swFmt(ms) { const t=Math.floor(ms/10); return String(Math.floor(t/6000)).padStart(2,'0')+':'+String(Math.floor(t/100)%60).padStart(2,'0'); }
+function swFmtMs(ms) { return '.'+String(Math.floor(ms/10)%100).padStart(2,'0'); }
+function swTick() { const e=swElapsed+(Date.now()-swStart); document.getElementById('sw-display').textContent=swFmt(e); document.getElementById('sw-ms').textContent=swFmtMs(e); }
+document.getElementById('sw-start').addEventListener('click', () => {
+  const btn=document.getElementById('sw-start');
+  if (!swRunning) { swStart=Date.now(); swInterval=setInterval(swTick,10); swRunning=true; btn.textContent=ksT('clock.stop','Stop'); btn.classList.remove('primary'); btn.classList.add('danger'); }
+  else { swElapsed+=Date.now()-swStart; clearInterval(swInterval); swRunning=false; btn.textContent=ksT('clock.start','Start'); btn.classList.remove('danger'); btn.classList.add('primary'); }
+});
+document.getElementById('sw-lap').addEventListener('click', () => {
+  if (!swRunning) return;
+  const e=swElapsed+(Date.now()-swStart);
+  swLaps.push(swFmt(e)+swFmtMs(e));
+  document.getElementById('sw-laps').innerHTML = swLaps.map((l,i)=>`<div class="sw-lap"><span>#${i+1}</span><span>${l}</span></div>`).reverse().join('');
+});
+document.getElementById('sw-reset').addEventListener('click', () => {
+  clearInterval(swInterval); swRunning=false; swElapsed=0; swLaps=[];
+  document.getElementById('sw-display').textContent='00:00';
+  document.getElementById('sw-ms').textContent='.00';
+  document.getElementById('sw-laps').innerHTML='';
+  const btn=document.getElementById('sw-start'); btn.textContent=ksT('clock.start','Start'); btn.classList.remove('danger'); btn.classList.add('primary');
+});
+
+// ── ODPOČET ──
+let cdRunning=false, cdRemaining=0, cdTotal=0, cdInterval=null;
+function cdFmt(ms) { const s=Math.ceil(ms/1000); return String(Math.floor(s/3600)).padStart(2,'0')+':'+String(Math.floor(s/60)%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+function cdTick() {
+  cdRemaining-=100;
+  if (cdRemaining<=0) {
+    cdRemaining=0; clearInterval(cdInterval); cdRunning=false;
+    document.getElementById('cd-display').textContent='00:00:00';
+    document.getElementById('cd-display').className='static-display done';
+    document.getElementById('cd-label').textContent='⏰ '+ksT('clock.timeUp','Čas vypršel!');
+    document.getElementById('cd-start').textContent=ksT('clock.start','Start'); document.getElementById('cd-start').classList.add('primary');
+    if (Notification.permission==='granted') new Notification('Dashboard K-S',{body:ksT('clock.notificationBody','Odpočet vypršel!')});
+    return;
+  }
+  document.getElementById('cd-display').textContent=cdFmt(cdRemaining);
+  document.getElementById('cd-label').textContent=Math.round((cdRemaining/cdTotal)*100)+'% '+ksT('clock.percentRemaining','zbývá');
+}
+document.getElementById('cd-start').addEventListener('click', () => {
+  const btn=document.getElementById('cd-start');
+  if (!cdRunning) {
+    const h=parseInt(document.getElementById('cd-h').value)||0;
+    const m=parseInt(document.getElementById('cd-m').value)||0;
+    const s=parseInt(document.getElementById('cd-s').value)||0;
+    const total=(h*3600+m*60+s)*1000; if(total<=0) return;
+    if (cdRemaining<=0) { cdRemaining=total; cdTotal=total; }
+    document.getElementById('cd-set').style.display='none';
+    document.getElementById('cd-display').className='static-display';
+    cdInterval=setInterval(cdTick,100); cdRunning=true;
+    btn.textContent=ksT('clock.pause','Pauza'); btn.classList.remove('primary');
+    if (Notification.permission==='default') Notification.requestPermission();
+  } else {
+    clearInterval(cdInterval); cdRunning=false; btn.textContent=ksT('clock.resume','Pokračovat'); btn.classList.add('primary');
+  }
+});
+document.getElementById('cd-reset').addEventListener('click', () => {
+  clearInterval(cdInterval); cdRunning=false; cdRemaining=0; cdTotal=0;
+  document.getElementById('cd-display').textContent='00:00:00';
+  document.getElementById('cd-display').className='static-display';
+  document.getElementById('cd-label').textContent=ksT('clock.setTimeAndStart','nastav čas a spusť');
+  document.getElementById('cd-set').style.display='flex';
+  const btn=document.getElementById('cd-start'); btn.textContent=ksT('clock.start','Start'); btn.classList.add('primary');
+});
+</script>
+</body>
+</html>

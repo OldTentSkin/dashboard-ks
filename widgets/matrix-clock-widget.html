@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Hodiny (Matrix)</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #39d353;
+    --gold-dim: rgba(57,211,83,0.3);
+    --gold-text: #c6f6c8;
+    --text-dim: #3a5f3f;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: 100%; }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0; margin: 0;
+  }
+
+  .mx-card {
+    width: 100%; height: 100%;
+    border-radius: 18px;
+    position: relative;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #1f9c3a 0%, #0e4a1c 30%, #051a09 60%, #000000 100%));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .mx-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+    z-index: 2;
+  }
+
+  canvas#mx-rain {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    opacity: 0.55;
+    z-index: 0;
+  }
+
+  .mx-label {
+    position: absolute; top: 12px; left: 18px;
+    font-size: 9px; letter-spacing: 3px; color: var(--gold-text);
+    text-transform: uppercase; font-family: var(--sans);
+    font-weight: 600; text-shadow: 0 0 8px rgba(57,211,83,0.5);
+    z-index: 2;
+  }
+
+  .mx-content {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px;
+  }
+  .mx-time {
+    font-family: var(--mono);
+    font-size: clamp(28px, 13cqw, 48px);
+    font-weight: 700;
+    color: #aaffb0;
+    text-shadow: 0 0 10px rgba(57,211,83,0.85), 0 0 24px rgba(57,211,83,0.5);
+    letter-spacing: 3px;
+    display: flex; align-items: baseline; gap: 4px;
+  }
+  .mx-secs {
+    font-size: 0.42em;
+    color: var(--gold);
+    opacity: 0.85;
+  }
+  .mx-date {
+    font-size: 11px;
+    color: var(--gold-text);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+</style>
+</head>
+<body>
+
+<div class="mx-card">
+  <canvas id="mx-rain"></canvas>
+  <div class="mx-label"><span data-i18n="clock.title">Hodiny</span></div>
+  <div class="mx-content">
+    <div class="mx-time">
+      <span id="mx-hm">--:--</span><span class="mx-secs" id="mx-s">--</span>
+    </div>
+    <div class="mx-date" id="mx-date">—</div>
+  </div>
+</div>
+
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+<script>
+// ── Digitální čas ──
+function DAYS(){return ksT('common.daysLower', ['neděle','pondělí','úterý','středa','čtvrtek','pátek','sobota']);}
+function MONTHS(){return ksT('common.months', ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince']);}
+
+function tick() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('mx-hm').textContent = `${h}:${m}`;
+  document.getElementById('mx-s').textContent = s;
+  document.getElementById('mx-date').textContent =
+    `${DAYS()[now.getDay()]}, ${now.getDate()}. ${MONTHS()[now.getMonth()]}`;
+}
+tick();
+setInterval(tick, 1000);
+window.addEventListener('ks-lang-applied', tick);
+
+// ── Matrix rain pozadí ──
+const canvas = document.getElementById('mx-rain');
+const ctx = canvas.getContext('2d');
+const CHARS = 'アイウエオカキクケコサシスセソ0123456789ZXY=*+-/<>'.split('');
+let cols, drops, fontSize = 14;
+
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+  cols = Math.floor(canvas.width / fontSize);
+  drops = new Array(cols).fill(0).map(() => Math.floor(Math.random() * -40));
+}
+window.addEventListener('resize', resize);
+resize();
+
+function draw() {
+  ctx.fillStyle = 'rgba(0,0,0,0.08)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.font = fontSize + 'px monospace';
+  for (let i = 0; i < cols; i++) {
+    const ch = CHARS[Math.floor(Math.random() * CHARS.length)];
+    const x = i * fontSize;
+    const y = drops[i] * fontSize;
+    ctx.fillStyle = Math.random() > 0.93 ? '#d6ffd9' : 'rgba(57,211,83,0.75)';
+    ctx.fillText(ch, x, y);
+    if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  }
+}
+setInterval(draw, 60);
+</script>
+</body>
+</html>

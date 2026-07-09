@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Nastavení úložiště</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    min-height: 100%;
+    background: var(--page-bg, #030303);
+    font-family: var(--mono);
+    color: var(--gold-text);
+  }
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 50px 20px 60px;
+  }
+  .title {
+    font-family: var(--sans); font-weight: 700; font-size: 26px;
+    color: var(--gold); letter-spacing: 1px; text-align: center;
+    text-shadow: 0 0 12px rgba(200,160,60,0.35);
+    margin-bottom: 10px;
+  }
+  .subtitle {
+    font-size: 13px; line-height: 1.6; color: var(--text-dim);
+    text-align: center; max-width: 520px; margin: 0 auto 36px;
+  }
+
+  .provider-card {
+    border: 1px solid var(--gold-dim);
+    border-radius: 16px;
+    padding: 20px 22px;
+    margin-bottom: 16px;
+    background: rgba(200,160,60,0.03);
+    transition: border-color 0.2s;
+  }
+  .provider-card.connected { border-color: var(--gold); background: rgba(200,160,60,0.07); }
+  .provider-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; gap: 10px; flex-wrap: wrap;
+  }
+  .provider-name {
+    font-family: var(--sans); font-weight: 700; font-size: 17px; color: var(--gold-text);
+  }
+  .provider-btn {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.5px;
+    background: rgba(200,160,60,0.14); border: 1px solid var(--gold-dim);
+    color: var(--gold); padding: 7px 18px; border-radius: 7px; cursor: pointer;
+    transition: background 0.15s; white-space: nowrap;
+  }
+  .provider-btn:hover { background: rgba(200,160,60,0.25); }
+  .provider-btn:disabled { opacity: 0.4; cursor: default; }
+  .provider-btn.connected-btn { background: rgba(46,204,143,0.15); border-color: rgba(46,204,143,0.4); color: #2ecc8f; cursor: default; }
+  .provider-btn.soon-btn { opacity: 0.4; cursor: not-allowed; }
+
+  .provider-detail-row { font-size: 11.5px; line-height: 1.6; color: var(--text-dim); margin-bottom: 4px; }
+  .provider-detail-row b { color: var(--gold-text); font-weight: 400; }
+  .provider-desc { font-size: 12px; line-height: 1.6; color: var(--gold-text); margin: 8px 0; }
+  .provider-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(200,160,60,0.08);
+    font-size: 10.5px; color: var(--text-dim); flex-wrap: wrap; gap: 6px;
+  }
+  .provider-footer a { color: var(--text-dim); text-decoration: underline; transition: color 0.15s; }
+  .provider-footer a:hover { color: var(--gold); }
+
+  .bottom-actions {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 28px;
+  }
+  .skip-link {
+    font-size: 12px; color: var(--text-dim); text-decoration: underline;
+    background: transparent; border: none; cursor: pointer; font-family: var(--mono);
+  }
+  .skip-link:hover { color: var(--gold); }
+  .continue-btn {
+    font-family: var(--sans); font-weight: 600; font-size: 14px;
+    background: var(--gold); color: #1a1000; border: none;
+    padding: 11px 28px; border-radius: 8px; cursor: pointer;
+    letter-spacing: 0.5px;
+  }
+  .continue-btn:hover { opacity: 0.9; }
+
+  .status-msg { font-size: 11px; margin-top: 8px; min-height: 14px; }
+  .status-msg.ok { color: #2ecc8f; }
+  .status-msg.err { color: #c04040; }
+</style>
+<script src="widgets/lang-loader.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="widgets/cloud-sync.js"></script>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="title" data-i18n="storage.title">Kam appka uloží tvá data?</div>
+  <div class="subtitle" data-i18n="storage.subtitle">Vyber si cloudové úložiště, kam si Dashboard K-S bude ukládat tvá data (nastavení, úkoly, poznámky, deník...). Nic se neukládá na serveru appky — data jsou vždy jen tvoje.</div>
+
+  <div id="provider-list"></div>
+
+  <div class="bottom-actions">
+    <button class="skip-link" id="skip-btn" data-i18n="storage.skip">Přeskočit prozatím</button>
+    <button class="continue-btn" id="continue-btn" data-i18n="storage.continueBtn">Pokračovat</button>
+  </div>
+</div>
+
+<script>
+const PROVIDERS = ['gdrive', 'onedrive', 'dropbox', 'local'];
+const AVAILABLE = { gdrive: true, onedrive: true, dropbox: true, local: true };
+
+function renderProviders() {
+  const list = document.getElementById('provider-list');
+  const connected = ksGetStorageProvider();
+
+  list.innerHTML = PROVIDERS.map(id => {
+    const p = { name: ksT(`storage.providers.${id}.name`), owner: ksT(`storage.providers.${id}.owner`),
+                servers: ksT(`storage.providers.${id}.servers`), desc: ksT(`storage.providers.${id}.desc`),
+                link: id === 'local' ? null : ksT(`storage.providers.${id}.link`) };
+    const isConnected = connected === id;
+    const isAvailable = AVAILABLE[id];
+    const isLocal = id === 'local';
+
+    let btnHtml;
+    if (isConnected) {
+      btnHtml = `<button class="provider-btn connected-btn" disabled>${ksT('storage.connected','✓ Připojeno')}</button>`;
+    } else if (isAvailable) {
+      const label = isLocal ? ksT('storage.select','Zvolit') : ksT('storage.connect','Připojit');
+      btnHtml = `<button class="provider-btn" data-connect="${id}">${label}</button>`;
+    } else {
+      btnHtml = `<button class="provider-btn soon-btn" disabled>${ksT('storage.comingSoon','Připravujeme')}</button>`;
+    }
+
+    return `
+    <div class="provider-card ${isConnected ? 'connected' : ''}">
+      <div class="provider-head">
+        <div class="provider-name">${p.name}</div>
+        ${btnHtml}
+      </div>
+      <div class="provider-detail-row"><b>${ksT('storage.owner','Vlastník:')}</b> ${p.owner}</div>
+      <div class="provider-detail-row"><b>${ksT('storage.servers','Servery:')}</b> ${p.servers}</div>
+      <div class="provider-desc">${p.desc}</div>
+      <div class="provider-footer">
+        <span>${ksT('storage.validAsOf','Platné k:')} ${ksT('storage.validDate','3. 7. 2026')}</span>
+        ${p.link ? `<a href="${p.link}" target="_blank" rel="noopener">${ksT('storage.moreInfo','Oficiální stránka')} →</a>` : ''}
+      </div>
+      ${isConnected ? `<div class="status-msg" id="status-${id}"></div>` : ''}
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('[data-connect]').forEach(btn => {
+    btn.addEventListener('click', () => handleConnect(btn.dataset.connect, btn));
+  });
+}
+
+function handleConnect(id, btn) {
+  if (id === 'local') {
+    ksSetStorageProvider('local');
+    try { localStorage.setItem('ks-onboarding-done', '1'); } catch {}
+    window.location.href = 'index.html';
+    return;
+  }
+
+  const connectors = { gdrive: ksConnectGoogleDrive, onedrive: ksConnectOneDrive, dropbox: ksConnectDropbox };
+  const connect = connectors[id];
+  if (!connect) return;
+
+  btn.disabled = true;
+  btn.textContent = '...';
+  connect((ok) => {
+    if (ok) {
+      renderProviders();
+    } else {
+      btn.disabled = false;
+      btn.textContent = ksT('storage.connect', 'Připojit');
+      alert(ksT('storage.syncError', '// chyba synchronizace'));
+    }
+  });
+}
+
+document.getElementById('skip-btn').addEventListener('click', () => {
+  try { localStorage.setItem('ks-onboarding-done', '1'); } catch {}
+  window.location.href = 'index.html';
+});
+document.getElementById('continue-btn').addEventListener('click', () => {
+  try { localStorage.setItem('ks-onboarding-done', '1'); } catch {}
+  window.location.href = 'index.html';
+});
+
+window.addEventListener('ks-lang-applied', renderProviders);
+KS_LANG_READY.then(renderProviders);
+</script>
+</body>
+</html>

@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Kalendář Widget</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-glow: rgba(200,160,60,0.1);
+    --gold-text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    height: 100%;
+  }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0;
+    margin: 0;
+  }
+
+  .cal-card {
+    width: 100%;
+    height: 100%;
+    border-radius: 18px;
+    padding: 14px 16px;
+    position: relative;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .cal-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  /* Header */
+  .cal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .cal-label {
+    font-size: 9px; letter-spacing: 3px; color: #f0d890;
+    text-transform: uppercase; font-family: var(--sans);
+    font-weight: 600; text-shadow: 0 0 8px rgba(240,216,80,0.4);
+  }
+  .cal-nav { display: flex; align-items: center; gap: 10px; }
+  .cal-nav-btn {
+    background: transparent; border: 1px solid rgba(200,160,60,0.2);
+    color: var(--text-dim); width: 22px; height: 22px;
+    border-radius: 4px; cursor: pointer; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .cal-nav-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .cal-month-label {
+    font-family: var(--sans); font-size: 13px; font-weight: 700;
+    color: var(--gold); letter-spacing: 2px; min-width: 120px; text-align: center;
+  }
+
+  /* Mřížka */
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    margin-bottom: 12px;
+  }
+  .cal-dow {
+    text-align: center; font-size: 9px; letter-spacing: 2px;
+    color: var(--gold); opacity: 1; font-weight: 700; padding: 4px 0; text-transform: uppercase;
+    text-shadow: 0 0 8px var(--gold);
+  }
+  .cal-cell {
+    min-height: 36px;
+    padding: 4px 3px;
+    border: 1px solid rgba(200,160,60,0.22);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .cal-cell:hover { background: rgba(200,160,60,0.14); border-color: var(--gold); cursor: pointer; transform: scale(1.04); transition: all 0.1s; }
+  .cal-cell.past-day { opacity: 0.4; }
+  .cal-cell.past-day:hover { opacity: 0.75; background: rgba(200,160,60,0.08); }
+  .cal-cell.today {
+    border-color: var(--gold);
+    background: transparent;
+  }
+  .cal-cell.selected {
+    border-color: #4a9eff;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px rgba(74,158,255,0.3);
+  }
+  .cal-cell.today.selected {
+    border-color: #4a9eff;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px rgba(74,158,255,0.5);
+  }
+  .cal-day-num {
+    font-size: 11px; color: var(--gold-text);
+    line-height: 1; margin-bottom: 2px;
+    font-family: var(--mono); font-weight: 600;
+  }
+  .cal-cell.today .cal-day-num { color: var(--gold); }
+  .cal-event-chip {
+    font-size: 11px; font-family: var(--mono); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; padding: 1px 4px 1px 5px;
+    border-radius: 2px; margin-bottom: 2px; line-height: 1.5;
+    border-left: 2px solid;
+    background: transparent !important;
+  }
+  .cal-more { font-size: 10px; font-family: var(--mono); color: var(--gold-text); opacity: 0.5; padding: 1px 3px; }
+
+  /* Detail dne */
+  .cal-detail {
+    border-top: 1px solid rgba(200,160,60,0.12);
+    padding-top: 8px;
+    flex-shrink: 0;
+  }
+  .cal-detail-label {
+    font-size: 9px; letter-spacing: 2px; color: var(--gold-text); opacity: 0.7;
+    text-transform: uppercase; margin-bottom: 8px;
+    font-family: var(--sans);
+  }
+  .cal-detail-empty { font-size: 10px; color: var(--gold-text); opacity: 0.55; padding: 8px 0; }
+
+  .cal-event-row {
+    display: flex; align-items: center; gap: 0;
+    padding: 5px 4px; border-bottom: 1px solid rgba(200,160,60,0.07);
+    position: relative;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+  .cal-event-row:last-child { border-bottom: none; }
+  .cal-event-row:hover { background: rgba(200,160,60,0.04); }
+  .cal-event-bar {
+    width: 3px;
+    align-self: stretch;
+    border-radius: 2px;
+    margin-right: 10px;
+    flex-shrink: 0;
+    min-height: 22px;
+  }
+  .cal-event-info { flex: 1; min-width: 0; }
+  .cal-event-title {
+    font-size: 11px; line-height: 1.4; color: var(--gold-text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cal-event-time  { font-size: 11px; font-family: var(--mono); color: var(--gold-text); opacity: 0.55; margin-top: 1px; letter-spacing: 0.5px; }
+  .cal-event-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
+  .cal-event-row:hover .cal-event-actions { opacity: 1; }
+  .cal-ev-btn {
+    background: transparent; border: none; font-size: 10px;
+    cursor: pointer; color: var(--text-dim); padding: 2px 3px;
+    border-radius: 3px; transition: color 0.15s;
+  }
+  .cal-ev-btn:hover { color: var(--gold); }
+  .cal-ev-btn.del:hover { color: #c04040; }
+
+  /* Edit inline */
+  .cal-edit-row {
+    display: none; padding: 6px 0; gap: 6px; flex-wrap: wrap;
+    border-bottom: 1px solid rgba(200,160,60,0.08);
+  }
+  .cal-edit-row.open { display: flex; }
+  .cal-edit-input {
+    flex: 1; min-width: 140px; background: rgba(200,160,60,0.06);
+    border: none; border-bottom: 1px solid var(--gold-dim);
+    color: var(--gold-text); font-family: var(--mono); font-size: 10px;
+    padding: 3px 6px; outline: none;
+  }
+  .cal-edit-time {
+    width: 80px; background: rgba(200,160,60,0.06);
+    border: 1px solid rgba(200,160,60,0.2); color: var(--gold-text);
+    font-family: var(--mono); font-size: 10px;
+    padding: 3px 5px; border-radius: 3px; outline: none;
+    color-scheme: dark;
+  }
+  .cal-edit-color {
+    width: 28px; height: 28px; border: none; border-radius: 4px;
+    cursor: pointer; padding: 2px; background: transparent;
+  }
+  .cal-edit-save {
+    background: rgba(200,160,60,0.15); border: 1px solid var(--gold-dim);
+    color: var(--gold); font-family: var(--mono); font-size: 9px;
+    padding: 3px 8px; border-radius: 3px; cursor: pointer;
+  }
+
+  /* Přidat událost */
+  .cal-add-row {
+    display: flex; gap: 6px; align-items: center;
+    padding-top: 10px; flex-wrap: wrap;
+  }
+  .cal-add-input {
+    flex: 1; min-width: 120px; background: transparent;
+    border: none; border-bottom: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text); font-family: var(--mono); font-size: 10px;
+    padding: 4px; outline: none; transition: border-color 0.2s;
+  }
+  .cal-add-input:focus { border-color: var(--gold); }
+  .cal-add-input::placeholder { color: var(--gold-text); opacity: 0.45; }
+  .cal-add-time {
+    width: 78px; background: transparent;
+    border: 1px solid rgba(200,160,60,0.2); color: var(--gold-text);
+    font-family: var(--mono); font-size: 10px;
+    padding: 3px 5px; border-radius: 3px; outline: none;
+    color-scheme: dark;
+  }
+  .cal-add-color {
+    width: 28px; height: 28px; border: none; border-radius: 4px;
+    cursor: pointer; padding: 2px; background: transparent;
+  }
+  .cal-add-btn {
+    background: rgba(200,160,60,0.12); border: 1px solid var(--gold-dim);
+    color: var(--gold); font-family: var(--mono); font-size: 11px;
+    padding: 3px 10px; border-radius: 4px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .cal-add-btn:hover { background: rgba(200,160,60,0.22); }
+
+  /* iCal sekce */
+  /* Týdenní přehled */
+  .cal-week-section {
+    flex-shrink: 0;
+    padding: 10px 0 6px;
+    border-top: 1px solid rgba(200,160,60,0.15);
+    margin-top: 6px;
+  }
+  .cal-week-label {
+    font-size: 8px; letter-spacing: 3px; color: var(--gold);
+    text-transform: uppercase; font-family: var(--sans); font-weight: 700;
+    margin-bottom: 8px; opacity: 0.9;
+  }
+  .cal-week-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px;
+  }
+  .cal-week-day {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 3px; padding: 4px 2px; border-radius: 6px;
+    border: 1px solid rgba(200,160,60,0.1);
+    transition: background 0.12s;
+  }
+  .cal-week-day.today {
+    border-color: var(--gold); background: rgba(200,160,60,0.08);
+  }
+  .cal-week-day:hover { background: rgba(200,160,60,0.1); cursor: pointer; }
+  .cal-week-dow {
+    font-size: 7px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--gold); font-family: var(--sans); font-weight: 700;
+    text-shadow: 0 0 6px var(--gold);
+  }
+  .cal-week-num {
+    font-size: 11px; font-family: var(--mono);
+    color: var(--gold-text); line-height: 1;
+  }
+  .cal-week-day.today .cal-week-num { color: var(--gold); font-weight: 700; }
+  .cal-week-events {
+    display: flex; flex-direction: column; gap: 2px; width: 100%;
+  }
+  .cal-week-ev {
+    height: 4px; border-radius: 2px; width: 100%;
+    box-shadow: 0 0 4px currentColor;
+  }
+  .cal-week-more {
+    font-size: 7px; color: var(--gold-text); opacity: 0.5;
+    text-align: center; font-family: var(--mono);
+  }
+
+  /* Google Calendar sekce */
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid rgba(200,160,60,0.08);
+  }
+  .cal-ical-toggle {
+    font-size: 8px; letter-spacing: 2px; color: var(--text-dim);
+    background: transparent; border: none; cursor: pointer;
+    text-transform: uppercase; padding: 0;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .cal-ical-toggle:hover { color: var(--gold); }
+  .cal-ical-form { display: none; margin-top: 8px; gap: 6px; flex-direction: column; }
+  .cal-ical-form.open { display: flex; }
+  .cal-ical-input {
+    background: rgba(200,160,60,0.06); border: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text); font-family: var(--mono); font-size: 9px;
+    padding: 5px 8px; border-radius: 4px; outline: none;
+  }
+  .cal-ical-input:focus { border-color: var(--gold); }
+  .cal-ical-input::placeholder { color: var(--text-dim); }
+  .cal-ical-row { display: flex; gap: 6px; }
+  .cal-ical-label { font-size: 8px; color: var(--text-dim); letter-spacing: 1px; }
+  .cal-ical-save {
+    background: rgba(200,160,60,0.12); border: 1px solid var(--gold-dim);
+    color: var(--gold); font-family: var(--mono); font-size: 9px;
+    padding: 4px 10px; border-radius: 3px; cursor: pointer;
+  }
+  .cal-ical-status { font-size: 9px; color: var(--text-dim); letter-spacing: 1px; }
+
+  .cal-google-connect {
+    width: 100%;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    background: rgba(200,160,60,0.08); border: 1px solid var(--gold-dim);
+    color: var(--gold-text); font-family: var(--mono); font-size: 9px;
+    letter-spacing: 1px; padding: 6px 10px; border-radius: 5px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .cal-google-connect:hover { background: rgba(200,160,60,0.16); border-color: var(--gold); }
+  .cal-google-connect.connected {
+    background: rgba(200,160,60,0.12); border-color: var(--gold-dim); color: var(--gold);
+  }
+  .cal-google-connect.connected:hover { background: rgba(224,80,80,0.12); border-color: rgba(224,80,80,0.4); color: #e05050; }
+</style>
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+</head>
+<body>
+
+<div class="cal-card">
+  <!-- Header -->
+  <div class="cal-header">
+    <div class="cal-label" data-i18n="calendar.title">Kalendář</div>
+    <div class="cal-nav">
+      <button class="cal-nav-btn" id="cal-prev">‹</button>
+      <div class="cal-month-label" id="cal-month-label">—</div>
+      <button class="cal-nav-btn" id="cal-next">›</button>
+    </div>
+  </div>
+
+  <!-- Mřížka -->
+  <div class="cal-grid" id="cal-grid"></div>
+
+  <!-- Detail vybraného dne -->
+  <div class="cal-detail">
+    <div class="cal-detail-label" id="cal-detail-label" data-i18n="calendar.selectDay">Vyberte den</div>
+    <div id="cal-detail-events"></div>
+    <div class="cal-add-row" id="cal-add-row" style="display:none;">
+      <input class="cal-add-input" id="cal-add-title" placeholder="+ nová událost..." data-i18n-placeholder="calendar.newEventPlaceholderPlus">
+      <input class="cal-add-time" type="time" id="cal-add-time">
+      <input class="cal-add-color" type="color" id="cal-add-color" value="#c8a03c">
+      <button class="cal-add-btn" id="cal-add-btn">+</button>
+    </div>
+  </div>
+
+  <!-- Týdenní přehled -->
+  <div class="cal-week-section" id="cal-week-section"></div>
+
+  <!-- Google Calendar OAuth -->
+  <div class="cal-ical-section">
+    <button class="cal-google-connect" id="cal-google-connect">
+      <span id="cal-google-icon">🔗</span> <span id="cal-google-label" data-i18n="calendar.connectGoogle">Připojit Google kalendář</span>
+    </button>
+    <div class="cal-ical-status" id="cal-ical-status"></div>
+  </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+const GOOGLE_CLIENT_ID = '590854974762-t377le81vrh8ak3bee3oqgbbm94vk12o.apps.googleusercontent.com';
+const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+const TOKEN_KEY = 'ks-google-token';
+const GOOGLE_EVENTS_KEY = 'ks-google-events';
+const STORAGE_KEY = 'ks-calendar';
+function DOW()    { return ksT('common.daysShort', ['Po','Út','St','Čt','Pá','So','Ne']); }
+function MONTHS_() { return ksT('common.monthsNominative', ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec']); }
+
+let events = {};  // { 'YYYY-MM-DD': [{id, title, time, color, ical}] }
+let icalEvents = {};
+let viewYear, viewMonth, selectedDate;
+
+function load() {
+  try { events = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { events = {}; }
+}
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(events)); writeMobSummary(); }
+function writeMobSummary() {
+  try {
+    let count = 0;
+    Object.values(events).forEach(list => { count += (list || []).length; });
+    Object.values(icalEvents).forEach(list => { count += (list || []).length; });
+    localStorage.setItem('ks-mob-calendar', JSON.stringify({ count }));
+  } catch {}
+}
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function getEventsForDay(dateStr) {
+  const manual = events[dateStr] || [];
+  const ical   = icalEvents[dateStr] || [];
+  return [...manual, ...ical].sort((a,b) => (a.time||'').localeCompare(b.time||''));
+}
+
+// ── RENDER MŘÍŽKY ──
+function renderGrid() {
+  const grid = document.getElementById('cal-grid');
+  document.getElementById('cal-month-label').textContent =
+    MONTHS_()[viewMonth] + ' ' + viewYear;
+
+  // Hlavičky
+  let html = DOW().map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  let startDow = firstDay.getDay(); // 0=ne
+  startDow = startDow === 0 ? 6 : startDow - 1; // pondělí = 0
+
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const daysInPrev  = new Date(viewYear, viewMonth, 0).getDate();
+  const today = new Date();
+  const todayStr = fmtDate(today.getFullYear(), today.getMonth(), today.getDate());
+
+  let cells = [];
+  // Předchozí měsíc
+  for (let i = startDow - 1; i >= 0; i--) {
+    const d = daysInPrev - i;
+    const yr = viewMonth === 0 ? viewYear - 1 : viewYear;
+    const mo = viewMonth === 0 ? 11 : viewMonth - 1;
+    cells.push({ day: d, year: yr, month: mo, other: true });
+  }
+  // Aktuální měsíc
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, year: viewYear, month: viewMonth, other: false });
+  // Příští měsíc
+  const remaining = 42 - cells.length;
+  for (let d = 1; d <= remaining; d++) {
+    const yr = viewMonth === 11 ? viewYear + 1 : viewYear;
+    const mo = viewMonth === 11 ? 0 : viewMonth + 1;
+    cells.push({ day: d, year: yr, month: mo, other: true });
+  }
+
+  html += cells.map(c => {
+    const dateStr = fmtDate(c.year, c.month, c.day);
+    const dayEvs  = getEventsForDay(dateStr);
+    const isToday = dateStr === todayStr;
+    const isSel   = dateStr === selectedDate;
+    const isPast  = dateStr < todayStr;
+    const cls = ['cal-cell', isPast?'past-day':'', isToday?'today':'', isSel?'selected':''].filter(Boolean).join(' ');
+
+    let chipsHtml = '';
+    const maxChips = 2;
+    dayEvs.slice(0, maxChips).forEach(ev => {
+      chipsHtml += `<div class="cal-event-chip" style="background:${ev.color}1a;color:${ev.color};border-left-color:${ev.color};">${escHtml(ev.title)}</div>`;
+    });
+    if (dayEvs.length > maxChips) chipsHtml += `<div class="cal-more">+${dayEvs.length - maxChips}</div>`;
+
+    return `<div class="${cls}" data-date="${dateStr}">
+      <div class="cal-day-num">${c.day}</div>
+      ${chipsHtml}
+    </div>`;
+  }).join('');
+
+  grid.innerHTML = html;
+
+  // Eventy na buňky
+  grid.querySelectorAll('.cal-cell').forEach(cell => {
+    cell.addEventListener('click', () => selectDay(cell.dataset.date));
+  });
+}
+
+function fmtDate(y, m, d) {
+  return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+// ── TÝDENNÍ PŘEHLED ──
+function renderWeek() {
+  const el = document.getElementById('cal-week-section');
+  if (!el) return;
+  const now = new Date();
+  const dow = now.getDay(); // 0=Ne, 1=Po...
+  const mondayOffset = (dow === 0 ? -6 : 1 - dow); // posun na pondělí
+  const monday = new Date(now.getTime() + mondayOffset * 86400000);
+  const dowLabels = ksT('common.daysShort', ['Po','Út','St','Čt','Pá','So','Ne']);
+  const todayStr = fmtDate(now);
+
+  let html = `<div class="cal-week-label">${ksT('calendar.thisWeek','Tento týden')}</div><div class="cal-week-grid">`;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday.getTime() + i * 86400000);
+    const dateStr = fmtDate(d);
+    const isToday = dateStr === todayStr;
+    const allEvs = [...(events[dateStr] || []), ...(icalEvents[dateStr] || [])];
+
+    html += `<div class="cal-week-day${isToday ? ' today' : ''}" data-date="${dateStr}">
+      <div class="cal-week-dow">${dowLabels[i]}</div>
+      <div class="cal-week-num">${d.getDate()}</div>
+      <div class="cal-week-events">`;
+    allEvs.slice(0, 3).forEach(ev => {
+      html += `<div class="cal-week-ev" style="background:${ev.color || 'var(--gold)'}; color:${ev.color || 'var(--gold)'}"></div>`;
+    });
+    if (allEvs.length > 3) {
+      html += `<div class="cal-week-more">+${allEvs.length - 3}</div>`;
+    }
+    html += `</div></div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+
+  // Klik na den → vybere ho v mřížce
+  el.querySelectorAll('[data-date]').forEach(d => {
+    d.addEventListener('click', () => selectDay(d.dataset.date));
+  });
+}
+
+// ── DETAIL DNE ──
+function selectDay(dateStr) {
+  selectedDate = dateStr;
+  renderGrid();
+
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  const days = ksT('common.days', ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota']);
+  document.getElementById('cal-detail-label').textContent =
+    `${days[dt.getDay()].toUpperCase()} ${d}. ${MONTHS_()[m-1].toUpperCase()} ${y}`;
+
+  const dayEvs = getEventsForDay(dateStr);
+  const container = document.getElementById('cal-detail-events');
+
+  if (!dayEvs.length) {
+    container.innerHTML = `<div class="cal-detail-empty">${ksT('calendar.noEvents', '// žádné události')}</div>`;
+  } else {
+    container.innerHTML = dayEvs.map(ev => `
+      <div class="cal-event-row" data-id="${ev.id}">
+        <div class="cal-event-bar" style="background:${ev.color};box-shadow:0 0 6px ${ev.color}66;"></div>
+        <div class="cal-event-info">
+          <div class="cal-event-title">${escHtml(ev.title)}</div>
+          ${ev.time ? `<div class="cal-event-time">${ev.time}</div>` : ''}
+        </div>
+        ${!ev.ical ? `
+        <div class="cal-event-actions">
+          <button class="cal-ev-btn" data-edit="${ev.id}">✎</button>
+          <button class="cal-ev-btn del" data-del="${ev.id}">✕</button>
+        </div>
+        <div class="cal-edit-row" id="edit-${ev.id}">
+          <input class="cal-edit-input" id="edit-title-${ev.id}" value="${escHtml(ev.title)}">
+          <input class="cal-edit-time" type="time" id="edit-time-${ev.id}" value="${ev.time||''}">
+          <input class="cal-edit-color" type="color" id="edit-color-${ev.id}" value="${ev.color}">
+          <button class="cal-edit-save" data-save="${ev.id}">OK</button>
+        </div>` : ''}
+      </div>
+    `).join('');
+
+    // Eventy
+    container.querySelectorAll('[data-edit]').forEach(btn => openEdit(btn.dataset.edit));
+    container.querySelectorAll('[data-del]').forEach(btn => {
+      btn.addEventListener('click', () => deleteEvent(dateStr, btn.dataset.del));
+    });
+    container.querySelectorAll('[data-edit]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        container.querySelectorAll('.cal-edit-row.open').forEach(r => r.classList.remove('open'));
+        document.getElementById('edit-' + btn.dataset.edit)?.classList.add('open');
+      });
+    });
+    container.querySelectorAll('[data-save]').forEach(btn => {
+      btn.addEventListener('click', () => saveEdit(dateStr, btn.dataset.save));
+    });
+  }
+
+  document.getElementById('cal-add-row').style.display = 'flex';
+  document.getElementById('cal-add-title').value = '';
+}
+
+// ── CRUD ──
+function addEvent() {
+  const title = document.getElementById('cal-add-title').value.trim();
+  if (!title || !selectedDate) return;
+  const time  = document.getElementById('cal-add-time').value;
+  const color = document.getElementById('cal-add-color').value;
+  if (!events[selectedDate]) events[selectedDate] = [];
+  events[selectedDate].push({ id: 'e_' + Date.now(), title, time, color });
+  save(); renderGrid(); renderWeek(); selectDay(selectedDate);
+  document.getElementById('cal-add-title').value = '';
+}
+
+function deleteEvent(dateStr, id) {
+  if (!events[dateStr]) return;
+  events[dateStr] = events[dateStr].filter(e => e.id !== id);
+  if (!events[dateStr].length) delete events[dateStr];
+  save(); renderGrid(); renderWeek(); selectDay(dateStr);
+}
+
+function saveEdit(dateStr, id) {
+  const title = document.getElementById('edit-title-' + id)?.value.trim();
+  const time  = document.getElementById('edit-time-' + id)?.value;
+  const color = document.getElementById('edit-color-' + id)?.value;
+  if (!title || !events[dateStr]) return;
+  const ev = events[dateStr].find(e => e.id === id);
+  if (ev) { ev.title = title; ev.time = time; ev.color = color; }
+  save(); renderGrid(); renderWeek(); selectDay(dateStr);
+}
+
+// ── GOOGLE CALENDAR API (OAuth) ──
+let tokenClient = null;
+let accessToken = null;
+
+function getColorForEvent(summary) {
+  const colors = ['#039be5','#33b679','#8e24aa','#e53935','#f4511e','#f6bf26'];
+  return colors[Math.abs(summary.charCodeAt(0)) % colors.length];
+}
+
+function isTokenValid() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
+    if (!saved || !saved.token || !saved.expires) return false;
+    return Date.now() < saved.expires;
+  } catch { return false; }
+}
+
+function loadSavedToken() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
+    if (saved && saved.token && Date.now() < saved.expires) {
+      accessToken = saved.token;
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+function updateConnectButton() {
+  const btn = document.getElementById('cal-google-connect');
+  const label = document.getElementById('cal-google-label');
+  const icon = document.getElementById('cal-google-icon');
+  if (accessToken) {
+    btn.classList.add('connected');
+    icon.textContent = '✓';
+    label.textContent = `${ksT('calendar.connected','Kalendář připojen')} (${ksT('calendar.clickToDisconnect','klik pro odpojení')})`;
+  } else {
+    btn.classList.remove('connected');
+    icon.textContent = '🔗';
+    label.textContent = ksT('calendar.connectGoogle', 'Připojit Google kalendář');
+  }
+}
+
+function initGoogleAuth() {
+  if (typeof google === 'undefined' || !google.accounts) {
+    setTimeout(initGoogleAuth, 300);
+    return;
+  }
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: GOOGLE_SCOPE,
+    callback: (resp) => {
+      if (resp.error) {
+        document.getElementById('cal-ical-status').textContent = ksT('calendar.loginFailed', '// přihlášení selhalo');
+        return;
+      }
+      accessToken = resp.access_token;
+      const expires = Date.now() + (resp.expires_in * 1000) - 60000;
+      localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: accessToken, expires }));
+      updateConnectButton();
+      fetchGoogleEvents();
+    }
+  });
+
+  if (loadSavedToken()) {
+    updateConnectButton();
+    fetchGoogleEvents();
+  }
+}
+
+async function fetchGoogleEvents() {
+  if (!accessToken) return;
+  const status = document.getElementById('cal-ical-status');
+  status.textContent = ksT('calendar.loading', '// načítám...');
+
+  const timeMin = new Date(); timeMin.setMonth(timeMin.getMonth() - 1);
+  const timeMax = new Date(); timeMax.setMonth(timeMax.getMonth() + 3);
+
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+      `timeMin=${timeMin.toISOString()}&timeMax=${timeMax.toISOString()}` +
+      `&singleEvents=true&orderBy=startTime&maxResults=250`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    if (res.status === 401) {
+      // token vypršel
+      accessToken = null;
+      localStorage.removeItem(TOKEN_KEY);
+      updateConnectButton();
+      status.textContent = ksT('calendar.loginExpired', '// přihlášení vypršelo, připoj znovu');
+      return;
+    }
+    if (!res.ok) throw new Error('API error');
+
+    const data = await res.json();
+    icalEvents = {};
+    (data.items || []).forEach(ev => {
+      const start = ev.start?.dateTime || ev.start?.date;
+      if (!start || !ev.summary) return;
+      const dateStr = start.slice(0, 10);
+      const time = ev.start?.dateTime ? start.slice(11, 16) : '';
+      const color = getColorForEvent(ev.summary);
+      if (!icalEvents[dateStr]) icalEvents[dateStr] = [];
+      icalEvents[dateStr].push({ id: 'g_' + ev.id, title: ev.summary, time, color, ical: true });
+    });
+
+    const count = Object.values(icalEvents).reduce((a,b) => a + b.length, 0);
+    status.textContent = `✓ ${count} ${ksT('calendar.events','událostí')}`;
+    localStorage.setItem(GOOGLE_EVENTS_KEY, JSON.stringify(icalEvents));
+    renderGrid(); renderWeek();
+    writeMobSummary();
+    if (selectedDate) selectDay(selectedDate);
+  } catch(e) {
+    status.textContent = ksT('calendar.loadError', '// chyba načítání z Google');
+  }
+}
+
+document.getElementById('cal-google-connect').addEventListener('click', () => {
+  if (accessToken) {
+    // odpojit
+    google.accounts.oauth2.revoke(accessToken, () => {});
+    accessToken = null;
+    icalEvents = {};
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(GOOGLE_EVENTS_KEY);
+    updateConnectButton();
+    document.getElementById('cal-ical-status').textContent = ksT('calendar.disconnected', '// odpojeno');
+    renderGrid();
+    if (selectedDate) selectDay(selectedDate);
+  } else {
+    tokenClient.requestAccessToken();
+  }
+});
+
+// ── INIT ──
+document.getElementById('cal-prev').addEventListener('click', () => {
+  viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+  renderGrid();
+});
+document.getElementById('cal-next').addEventListener('click', () => {
+  viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+  renderGrid();
+});
+
+document.getElementById('cal-add-btn').addEventListener('click', addEvent);
+document.getElementById('cal-add-title').addEventListener('keydown', e => { if (e.key==='Enter') addEvent(); });
+
+// Init
+const now = new Date();
+viewYear = now.getFullYear(); viewMonth = now.getMonth();
+load();
+renderGrid();
+renderWeek();
+writeMobSummary();
+
+// Inicializace Google OAuth (zkusí obnovit uloženou relaci)
+initGoogleAuth();
+
+// Vyber dnešek automaticky
+selectDay(fmtDate(now.getFullYear(), now.getMonth(), now.getDate()));
+
+// Když se přepne jazyk, překresli texty
+window.addEventListener('ks-lang-applied', () => {
+  renderGrid();
+  updateConnectButton();
+  if (selectedDate) selectDay(selectedDate);
+});
+</script>
+</body>
+</html>

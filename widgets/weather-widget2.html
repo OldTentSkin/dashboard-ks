@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Počasí Widget</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-glow: rgba(200,160,60,0.12);
+    --bg: #07060a;
+    --text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html {
+    height: 100%;
+  }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0;
+    margin: 0;
+    width: 100%;
+  }
+
+  /* ── WIDGET ── */
+  .weather-card {
+    width: 100%;
+    height: 100%;
+    border-radius: 18px;
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(200,160,60,0.3);
+    background: radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%);
+    transition: background 1.5s ease, border-color 1.5s ease;
+  }
+
+  .wx-settings-btn {
+    position: absolute;
+    bottom: 14px; right: 14px;
+    z-index: 5;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.45);
+    border: 1px solid rgba(200,160,60,0.4);
+    color: rgba(232,217,176,0.8);
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .wx-settings-btn:hover {
+    background: rgba(200,160,60,0.25);
+    border-color: var(--gold);
+    color: var(--gold);
+    transform: rotate(35deg);
+  }
+
+  /* Canvas pro particle efekty */
+  #wx-canvas {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    border-radius: 18px;
+  }
+
+  /* Top edge glow */
+  .weather-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+    transition: background 1.5s;
+  }
+
+  .wx-inner { position: relative; z-index: 2; }
+
+  /* Header */
+  .wx-header {
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .wx-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #f0d890;
+    text-transform: uppercase;
+    font-family: var(--sans);
+    font-weight: 600;
+    text-shadow: 0 0 8px rgba(240,216,80,0.4);
+  }
+  .wx-time { display: none; }
+
+  /* Sup + teplota */
+  .wx-main {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-bottom: 8px;
+    min-height: 120px;
+  }
+
+  .wx-vulture {
+    width: 240px;
+    height: 200px;
+    flex-shrink: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-top: -20px;
+  }
+
+  .wx-vulture img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    filter: var(--vul-glow, drop-shadow(0 4px 16px rgba(200,160,60,0.35)) drop-shadow(0 0 8px rgba(200,160,60,0.15)));
+    animation: vultureFloat 4s ease-in-out infinite;
+    transform-origin: center bottom;
+    mix-blend-mode: normal;
+  }
+
+  @keyframes vultureFloat {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25% { transform: translateY(-4px) rotate(0.5deg); }
+    75% { transform: translateY(-2px) rotate(-0.5deg); }
+  }
+
+  /* Teplota */
+  .wx-temp-block { flex: 1; }
+  .wx-temp {
+    font-family: var(--sans);
+    font-size: 62px;
+    font-weight: 700;
+    color: var(--gold);
+    line-height: 1;
+    transition: color 1.5s;
+  }
+  .wx-feels {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-dim);
+    margin-top: 2px;
+    letter-spacing: 0.5px;
+  }
+  .wx-desc {
+    font-size: 12px;
+    color: var(--text);
+    margin-top: 6px;
+    opacity: 0.8;
+    letter-spacing: 0.5px;
+    font-family: var(--sans);
+    font-weight: 600;
+  }
+
+  /* Hláška */
+  .wx-recommendation {
+    font-size: 12px;
+    padding: 9px 14px;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    background: var(--gold-glow);
+    border: 1px solid var(--gold-dim);
+    color: var(--text);
+    letter-spacing: 0.5px;
+    transition: all 1.5s;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Praporek u větru */
+  .wx-stats {
+    display: flex;
+    border-top: 1px solid rgba(200,160,60,0.1);
+    padding-top: 12px;
+    gap: 0;
+  }
+  .wx-stat {
+    flex: 1;
+    text-align: center;
+  }
+  .wx-stat-label {
+    font-size: 14px;
+    margin-bottom: 3px;
+    opacity: 0.7;
+    line-height: 1;
+  }
+  .wx-stat-val {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text);
+  }
+
+  /* Praporek animace */
+  .wind-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .flag-pole {
+    width: 2px;
+    height: 22px;
+    background: var(--gold-dim);
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .flag-cloth {
+    width: 26px;
+    height: 14px;
+    background: linear-gradient(135deg, var(--gold), rgba(200,160,60,0.5));
+    border-radius: 0 3px 3px 0;
+    display: inline-block;
+    transform-origin: left center;
+    vertical-align: middle;
+    transition: width 1s ease, height 1s ease, border-radius 1s ease, transform 1s ease;
+  }
+  /* Bezvětří — vlajka jako trojúhelník visící svisle podél žerdě */
+  .flag-droop-svg {
+    display: inline-block;
+    vertical-align: middle;
+    transform-origin: 0px 0px;
+    animation: flagDroopSvg 6s ease-in-out infinite;
+    margin-left: -2px;
+  }
+  @keyframes flagDroopSvg {
+    0%, 100% { transform: rotate(0deg); }
+    50%      { transform: rotate(2deg); }
+  }
+  /* Rychlost vlání podle větru */
+  .flag-calm  { animation: flagWaveCalm 5s ease-in-out infinite; }
+  .flag-slow  { animation: flagWave 3.5s ease-in-out infinite; }
+  .flag-med   { animation: flagWave 2s ease-in-out infinite; }
+  .flag-fast  { animation: flagWaveFast 0.8s ease-in-out infinite; }
+  .flag-storm { animation: flagWaveStorm 0.3s ease-in-out infinite; }
+
+  @keyframes flagWaveCalm {
+    0%   { transform: perspective(60px) rotateY(0deg) skewY(0deg); }
+    50%  { transform: perspective(60px) rotateY(-3deg) skewY(-0.5deg); }
+    100% { transform: perspective(60px) rotateY(0deg) skewY(0deg); }
+  }
+  @keyframes flagWave {
+    0%   { transform: perspective(40px) rotateY(0deg) skewY(0deg); }
+    20%  { transform: perspective(40px) rotateY(-6deg) skewY(-1deg); }
+    40%  { transform: perspective(40px) rotateY(4deg) skewY(0.5deg); }
+    60%  { transform: perspective(40px) rotateY(-3deg) skewY(-0.5deg); }
+    80%  { transform: perspective(40px) rotateY(5deg) skewY(1deg); }
+    100% { transform: perspective(40px) rotateY(0deg) skewY(0deg); }
+  }
+  @keyframes flagWaveFast {
+    0%   { transform: perspective(40px) rotateY(0deg) skewY(0deg); }
+    15%  { transform: perspective(40px) rotateY(-18deg) skewY(-3deg); }
+    35%  { transform: perspective(40px) rotateY(14deg) skewY(2deg); }
+    55%  { transform: perspective(40px) rotateY(-16deg) skewY(-2deg); }
+    75%  { transform: perspective(40px) rotateY(12deg) skewY(3deg); }
+    100% { transform: perspective(40px) rotateY(0deg) skewY(0deg); }
+  }
+  @keyframes flagWaveStorm {
+    0%   { transform: perspective(30px) rotateY(0deg) skewY(-4deg); }
+    10%  { transform: perspective(30px) rotateY(-25deg) skewY(4deg); }
+    25%  { transform: perspective(30px) rotateY(20deg) skewY(-5deg); }
+    40%  { transform: perspective(30px) rotateY(-22deg) skewY(3deg); }
+    55%  { transform: perspective(30px) rotateY(18deg) skewY(-4deg); }
+    70%  { transform: perspective(30px) rotateY(-20deg) skewY(5deg); }
+    85%  { transform: perspective(30px) rotateY(22deg) skewY(-3deg); }
+    100% { transform: perspective(30px) rotateY(0deg) skewY(-4deg); }
+  }
+
+  /* Text na praporku */
+  .flag-text {
+    font-size: 8px;
+    font-family: var(--sans);
+    font-weight: 700;
+    color: var(--bg);
+    position: absolute;
+    left: 3px;
+    top: 50%;
+    transform: translateY(-50%);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .flag-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Stavové barevné témata — zlatý roh vlevo nahoře, černá vpravo dole */
+  .wx-card--sunny { background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%)); border-color: var(--gold-dim, rgba(255,200,60,0.5)); }
+  .wx-card--cloudy { background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #504030 0%, #302818 30%, #181008 60%, #000000 100%)); border-color: var(--gold-dim, rgba(200,160,60,0.2)); }
+  .wx-card--rain { background: radial-gradient(ellipse at 0% 0%, #1a4a90 0%, #0e2850 30%, #060e20 60%, #000000 100%); border-color: rgba(60,120,255,0.5); }
+  .wx-card--storm { background: radial-gradient(ellipse at 0% 0%, #6020b0 0%, #380870 30%, #100420 60%, #000000 100%); border-color: rgba(180,60,255,0.5); }
+  .wx-card--snow { background: radial-gradient(ellipse at 0% 0%, #3060a0 0%, #183060 30%, #080e20 60%, #000000 100%); border-color: rgba(160,210,255,0.4); }
+  .wx-card--fog { background: radial-gradient(ellipse at 0% 0%, #404040 0%, #202020 30%, #101010 60%, #000000 100%); border-color: rgba(160,160,160,0.25); }
+  .wx-card--hot { background: radial-gradient(ellipse at 0% 0%, #c04000 0%, #701800 30%, #200800 60%, #000000 100%); border-color: rgba(255,100,20,0.5); }
+
+  /* Blesk u bouřky */
+  @keyframes lightning {
+    0%, 88%, 100% { opacity: 0; }
+    90%, 96% { opacity: 0.08; }
+    93% { opacity: 0; }
+  }
+  .lightning-flash {
+    position: absolute; inset: 0; border-radius: 18px;
+    background: rgba(200,150,255,1);
+    opacity: 0; pointer-events: none; z-index: 1;
+  }
+  .wx-card--storm .lightning-flash { animation: lightning 5s infinite; }
+
+  /* Loading */
+  .wx-loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-dim);
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+  .wx-error { color: #c04040; font-size: 10px; padding: 20px; text-align: center; }
+
+  /* Forecast */
+  .wx-forecast {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(200,160,60,0.08);
+  }
+  .wx-fc-day {
+    flex: 1; text-align: center;
+    font-size: 12px; color: var(--text-dim);
+  }
+  .wx-fc-day .fc-name { letter-spacing: 0.5px; margin-bottom: 2px; font-size: 11px; font-family: var(--mono); color: #c8b080; }
+  .wx-fc-day .fc-icon { font-size: 14px; margin-bottom: 2px; }
+  .wx-fc-day .fc-temp { color: var(--text); font-size: 11px; font-family: var(--mono); }
+</style>
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+</head>
+<body>
+
+<div class="weather-card" id="wx-card">
+  <canvas id="wx-canvas"></canvas>
+  <div class="lightning-flash"></div>
+
+  <div class="wx-inner">
+    <div class="wx-header">
+      <div class="wx-label" id="wx-label">Počasí · Jenštejn</div>
+      <div class="wx-time" id="wx-time">--:--</div>
+    </div>
+
+    <div id="wx-content">
+      <div class="wx-loading" data-i18n="common.loading">// načítám data...</div>
+    </div>
+  </div>
+
+  <button class="wx-settings-btn" onclick="openSettings()" title="Nastavení" data-i18n-title="weather.settings">⚙</button>
+</div>
+
+<script>
+// ── NASTAVENÍ ──
+function openSettings() {
+  try {
+    window.top.location.href = '../settings.html';
+  } catch {
+    window.location.href = '../settings.html';
+  }
+}
+
+// ── ČAS ──
+function updateTime() {
+  const now = new Date();
+  document.getElementById('wx-time').textContent =
+    String(now.getHours()).padStart(2,'0') + ':' +
+    String(now.getMinutes()).padStart(2,'0');
+}
+updateTime();
+setInterval(updateTime, 1000);
+
+// ── MAPOVÁNÍ WMO KÓDŮ ──
+function getWeatherState(code, hour) {
+  // Denní doba
+  const isNight = hour < 6 || hour >= 21;
+  const isSunset = (hour >= 18 && hour < 21) || (hour >= 5 && hour < 7);
+
+  if ([0,1].includes(code)) {
+    if (isNight) return 'night';
+    if (isSunset) return 'sunset';
+    return 'sunny';
+  }
+  if ([2,3,45,48].includes(code)) return code >= 45 ? 'fog' : 'cloudy';
+  if ([51,53,55,61,63,65,80,81,82].includes(code)) return 'rain';
+  if ([95,96,99].includes(code)) return 'storm';
+  if ([71,73,75,77,85,86].includes(code)) return 'snow';
+  if (code === 0 && !isNight) return 'sunny';
+  return 'cloudy';
+}
+
+// ── HLÁŠKY ──
+function getRecommendation(state, windSpeed, precipitation, temp) {
+  if (state === 'storm')  return ksT('weather.messages.storm', '⚡ Zůstaň radši doma, venku je to divoké');
+  if (state === 'snow') {
+    if (windSpeed > 30) return ksT('weather.messages.snowStorm', '🌨️ Vánice — bez nutnosti ven nechoď');
+    return ksT('weather.messages.snow', '🧤 Rukavice a pevné boty, bude klouzat');
+  }
+  if (state === 'fog')    return ksT('weather.messages.fog', '🌫️ Opatrně v autě — svítit a zpomalit');
+  if (state === 'rain') {
+    if (precipitation > 10) return ksT('weather.messages.rainHeavy', '☂️ Silný déšť — deštník nestačí, vezmi pláštěnku');
+    if (windSpeed > 30) return ksT('weather.messages.rainWindy', '💨 Vítr ti deštník vyvrátí — radši pláštěnku');
+    return ksT('weather.messages.rain', '☂️ Bez deštníku ani krok');
+  }
+  if (state === 'cloudy') {
+    if (precipitation > 0) return ksT('weather.messages.cloudyPrecip', '🌦️ Možné přeháňky — deštník radši vezmi');
+    return ksT('weather.messages.cloudyDry', '🌥️ Zataženo, ale sucho — deštník pro jistotu');
+  }
+  if (temp > 33)          return ksT('weather.messages.extremeHeat', '🥵 Extrémní vedro — vyhni se přímému slunci 12–16h');
+  if (temp > 28)          return ksT('weather.messages.hotDay', '☀️ Horký den — nezapomeň na vodu a krém');
+  if (state === 'sunset') return ksT('weather.messages.sunset', '🌅 Večer bude chladněji — vezmi vrstvu navíc');
+  if (state === 'night')  return ksT('weather.messages.night', '🌙 V noci se ochlaď — kolo je ok, vezmi svetr');
+  if (windSpeed > 40)     return ksT('weather.messages.windy', '💨 Silný vítr — pozor na cyklisty a stromy');
+  return ksT('weather.messages.beautifulDay', '☀️ Krásný den — užij si ho naplno');
+}
+
+// ── CANVAS EFEKTY ──
+const canvas = document.getElementById('wx-canvas');
+const ctx = canvas.getContext('2d');
+let particles = [];
+let fxAnimId = null;
+
+function resizeCanvas() {
+  const card = document.getElementById('wx-card');
+  canvas.width = card.offsetWidth;
+  canvas.height = card.offsetHeight;
+}
+
+function stopFx() {
+  if (fxAnimId) { cancelAnimationFrame(fxAnimId); fxAnimId = null; }
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  particles = [];
+}
+
+function startFx(type) {
+  stopFx();
+  resizeCanvas();
+  if (type === 'rain' || type === 'storm') {
+    const color = type === 'storm' ? 'rgba(180,120,255,0.5)' : 'rgba(100,160,255,0.5)';
+    particles = Array.from({length: type === 'storm' ? 80 : 55}, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      len: 8 + Math.random() * 14,
+      speed: (type === 'storm' ? 7 : 4) + Math.random() * 4,
+      op: 0.2 + Math.random() * 0.4,
+    }));
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      particles.forEach(p => {
+        ctx.globalAlpha = p.op;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - (type==='storm'?2:1), p.y + p.len);
+        ctx.stroke();
+        p.y += p.speed;
+        if (p.y > canvas.height) { p.y = -p.len; p.x = Math.random() * canvas.width; }
+      });
+      ctx.globalAlpha = 1;
+      fxAnimId = requestAnimationFrame(draw);
+    };
+    draw();
+  } else if (type === 'snow') {
+    particles = Array.from({length: 45}, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: 1.5 + Math.random() * 2.5,
+      speed: 0.4 + Math.random() * 1,
+      drift: (Math.random() - 0.5) * 0.3,
+      op: 0.3 + Math.random() * 0.5,
+    }));
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        ctx.globalAlpha = p.op;
+        ctx.fillStyle = '#c0e0ff';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx.fill();
+        p.y += p.speed; p.x += p.drift;
+        if (p.y > canvas.height) { p.y = -4; p.x = Math.random() * canvas.width; }
+        if (p.x < 0) p.x = canvas.width;
+        if (p.x > canvas.width) p.x = 0;
+      });
+      ctx.globalAlpha = 1;
+      fxAnimId = requestAnimationFrame(draw);
+    };
+    draw();
+  } else if (type === 'fog') {
+    let t = 0;
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      t += 0.002;
+      for (let i = 0; i < 3; i++) {
+        const x = (Math.sin(t + i * 1.4) * 0.5 + 0.5) * canvas.width;
+        const y = canvas.height * (0.25 + i * 0.25);
+        const g = ctx.createRadialGradient(x, y, 0, x, y, canvas.width * 0.55);
+        g.addColorStop(0, 'rgba(160,160,180,0.06)');
+        g.addColorStop(1, 'rgba(160,160,180,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      fxAnimId = requestAnimationFrame(draw);
+    };
+    draw();
+  }
+}
+
+// ── PRAPOREK ──
+function buildFlag(windSpeed) {
+  let cls = 'flag-droop';
+  if (windSpeed > 50) cls = 'flag-storm';
+  else if (windSpeed > 30) cls = 'flag-fast';
+  else if (windSpeed > 15) cls = 'flag-med';
+  else if (windSpeed > 8)  cls = 'flag-slow';
+  else if (windSpeed > 3)  cls = 'flag-calm';
+
+  if (cls === 'flag-droop') {
+    return `<span class="wind-flag">
+      <span class="flag-pole"></span>
+      <svg class="flag-droop-svg" width="8" height="20" viewBox="0 0 8 20">
+        <polygon points="0,0 8,16 0,20" fill="var(--gold)" />
+      </svg>
+    </span>
+    ${windSpeed} km/h`;
+  }
+
+  return `<span class="wind-flag">
+    <span class="flag-pole"></span>
+    <span class="flag-wrap">
+      <span class="flag-cloth ${cls}"></span>
+      <span class="flag-text">KS</span>
+    </span>
+  </span>
+  ${windSpeed} km/h`;
+}
+
+// ── RENDER ──
+function renderWeather(data) {
+  const cur = data.current;
+  const now = new Date();
+  const hour = now.getHours();
+  const state = getWeatherState(cur.weather_code, hour);
+  const rec = getRecommendation(state, cur.wind_speed_10m, cur.precipitation ?? 0, cur.temperature_2m);
+
+  // Supové obrázky — cesta relativní k HTML souboru
+  const vultureMap = {
+    sunny: 'vultures8/sunny.png',
+    sunset: 'vultures8/sunny.png',
+    night: 'vultures8/sunny.png',
+    cloudy: 'vultures8/sunny.png',
+    rain: 'vultures8/rainy.png',
+    storm: 'vultures8/storm.png',
+    snow: 'vultures8/snow.png',
+    fog: 'vultures8/fog.png',
+    hot: 'vultures8/hot.png',
+  };
+
+  // Třídy pro téma
+  const themeMap = {
+    sunny: 'wx-card--sunny', sunset: 'wx-card--sunny',
+    night: 'wx-card--cloudy', cloudy: 'wx-card--cloudy',
+    rain: 'wx-card--rain', storm: 'wx-card--storm',
+    snow: 'wx-card--snow', fog: 'wx-card--fog',
+    hot: 'wx-card--hot',
+  };
+
+  // Pozadí karty — pro sunny/cloudy použijeme motiv, pro atmosférické stavy vlastní barvu
+  const wxBgMap = {};  // Pozadí vždy z motivu, počasí je jen animovaná vrstva
+  const themeId2 = typeof ksGetTheme === 'function' ? ksGetTheme() : 'gold';
+  const themeBg = (typeof KS_THEMES !== 'undefined' && KS_THEMES[themeId2]?.cardBg) || 'radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%)';
+  document.getElementById('wx-card').style.background = themeBg;
+
+  // Forecast
+  const days = ksT('common.daysShortSun', ['Ne','Po','Út','St','Čt','Pá','So']);
+  const fcEmoji = { sunny:'☀️', cloudy:'⛅', rain:'🌧️', storm:'⛈️', snow:'❄️', fog:'🌫️', night:'🌙', sunset:'🌇', hot:'🔥' };
+  const fcHtml = (data.daily?.time || []).slice(1,7).map((d, i) => {
+    const max = Math.round(data.daily.temperature_2m_max[i+1]);
+    const min = Math.round(data.daily.temperature_2m_min[i+1]);
+    const code = data.daily.weather_code[i+1];
+    const state = getWeatherState(code, 12);
+    const dt = new Date(d);
+    return `<div class="wx-fc-day">
+      <div class="fc-name">${days[dt.getDay()]}</div>
+      <div class="fc-icon">${fcEmoji[state] || '⛅'}</div>
+      <div class="fc-temp">${max}°/${min}°</div>
+    </div>`;
+  }).join('');
+
+  // Pocitová teplota z apparent_temperature pokud je dostupná
+  const feels = cur.apparent_temperature != null
+    ? `${ksT('weather.feelsLike','pocitově')} ${Math.round(cur.apparent_temperature)}°`
+    : '';
+
+  document.getElementById('wx-content').innerHTML = `
+    <div class="wx-main">
+      <div class="wx-vulture">
+        <img src="${vultureMap[state] || vultureMap.sunny}" alt="sup" id="wx-sup">
+      </div>
+      <div class="wx-temp-block">
+        <div class="wx-temp">${Math.round(cur.temperature_2m)}°</div>
+        ${feels ? `<div class="wx-feels">${feels}</div>` : ''}
+        <div class="wx-desc" id="wx-desc-text">${ksT('weather.descLoading','načítám...')}</div>
+      </div>
+    </div>
+
+    <div class="wx-recommendation">${rec}</div>
+
+    <div class="wx-stats">
+      <div class="wx-stat">
+        <div class="wx-stat-label">💨</div>
+        <div class="wx-stat-val">${buildFlag(Math.round(cur.wind_speed_10m))}</div>
+      </div>
+      <div class="wx-stat">
+        <div class="wx-stat-label">💧</div>
+        <div class="wx-stat-val">${cur.relative_humidity_2m ?? '—'}%</div>
+      </div>
+      <div class="wx-stat">
+        <div class="wx-stat-label">🌡️</div>
+        <div class="wx-stat-val">${Math.round(data.daily.temperature_2m_max[0])}° / ${Math.round(data.daily.temperature_2m_min[0])}°</div>
+      </div>
+    </div>
+
+    ${fcHtml ? `<div class="wx-forecast">${fcHtml}</div>` : ''}
+  `;
+
+  // Popis počasí (WMO kód → text)
+  const wmoText = {
+    0: ksT('weather.conditions.clearSky','Jasno'), 1: ksT('weather.conditions.clear','Převážně jasno'),
+    2: ksT('weather.conditions.partlyCloudy','Polojasno'), 3: ksT('weather.conditions.cloudy','Zataženo'),
+    45: ksT('weather.conditions.fogPlain','Mlha'), 48: ksT('weather.conditions.fog','Námrazová mlha'),
+    51: ksT('weather.conditions.drizzle','Mrholení'), 53: ksT('weather.conditions.drizzle','Mrholení'), 55: ksT('weather.conditions.heavyDrizzle','Silné mrholení'),
+    61: ksT('weather.conditions.rain','Déšť'), 63: ksT('weather.conditions.rain','Déšť'), 65: ksT('weather.conditions.heavyRain','Silný déšť'),
+    71: ksT('weather.conditions.snow','Sněžení'), 73: ksT('weather.conditions.snow','Sněžení'), 75: ksT('weather.conditions.heavySnow','Silné sněžení'), 77: ksT('weather.conditions.snowGrains','Sněhové krupky'),
+    80: ksT('weather.conditions.showers','Přeháňky'), 81: ksT('weather.conditions.showers','Přeháňky'), 82: ksT('weather.conditions.heavyShowers','Silné přeháňky'),
+    85: ksT('weather.conditions.snowShowers','Sněhové přeháňky'), 86: ksT('weather.conditions.heavySnowShowers','Silné sněhové přeháňky'),
+    95: ksT('weather.conditions.thunderstorm','Bouřka'), 96: ksT('weather.conditions.thunderstormHail','Bouřka s kroupami'), 99: ksT('weather.conditions.heavyThunderstormHail','Silná bouřka s kroupami'),
+  };
+  const descEl = document.getElementById('wx-desc-text');
+  if (descEl) descEl.textContent = wmoText[cur.weather_code] || ksT('weather.conditions.variable','Proměnlivě');
+
+  // Glow supa podle stavu
+  const supEl = document.getElementById('wx-sup');
+  if (supEl) {
+    // Čteme barvu přímo z KS_THEMES (theme-loader.js) — spolehlivější než CSS proměnná v iframe
+    const themeId = typeof ksGetTheme === 'function' ? ksGetTheme() : 'gold';
+    const themeCol = (typeof KS_THEMES !== 'undefined' && KS_THEMES[themeId]?.vars?.['--gold']) || '#c8a03c';
+    const weatherGlowMap = {};  // Glow vždy z barvy motivu
+    const glow = `drop-shadow(0 4px 20px ${themeCol}88) drop-shadow(0 0 12px ${themeCol}55)`;
+    supEl.style.filter = glow;
+    supEl.dataset.wxState = state;
+  }
+
+  // Canvas efekty
+  const fxMap = { rain:'rain', storm:'storm', snow:'snow', fog:'fog' };
+  if (fxMap[state]) startFx(fxMap[state]);
+  else stopFx();
+
+  // Zápis souhrnu pro mobilní kartu v index.html
+  try {
+    // Stav (např. "cloudy", "night") se musí přemapovat na skutečný název obrázku
+    // (více stavů sdílí stejný soubor, např. cloudy/night/sunset → sunny.png).
+    const iconFile = (vultureMap[state] || vultureMap.sunny)
+      .replace('vultures8/', '')
+      .replace('.png', '');
+    // Sloučit s existujícími daty (index.html si sem ukládá 3denní předpověď,
+    // kterou bychom jinak přepsáním celého objektu smazali).
+    const existing = JSON.parse(localStorage.getItem('ks-mob-weather') || '{}');
+    localStorage.setItem('ks-mob-weather', JSON.stringify({
+      ...existing,
+      temp: cur.temperature_2m,
+      cond: wmoText[cur.weather_code] || ksT('weather.conditions.variable','Proměnlivě'),
+      img: iconFile,
+    }));
+  } catch {}
+}
+
+// ── NAČTENÍ DAT ──
+async function loadWeather() {
+  const locRaw = localStorage.getItem('ks-weather-loc');
+  const loc = locRaw ? JSON.parse(locRaw) : { lat: 50.1667, lon: 14.5333, name: 'Jenštejn' };
+  const lat = loc.lat, lon = loc.lon;
+  // Zobraz název widgetu + polohu v hlavičce
+  const labelEl = document.getElementById('wx-label');
+  if (labelEl) labelEl.textContent = `${ksT('weather.title','Počasí')} · ${(loc.name || '').toUpperCase()}`;
+  const url = `https://api.open-meteo.com/v1/forecast`
+    + `?latitude=${lat}&longitude=${lon}`
+    + `&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m,precipitation`
+    + `&daily=temperature_2m_max,temperature_2m_min,weather_code`
+    + `&timezone=Europe%2FBerlin&forecast_days=7`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    renderWeather(data);
+  } catch(e) {
+    document.getElementById('wx-content').innerHTML =
+      `<div class="wx-error">${ksT('weather.loadError', '// Nepodařilo se načíst počasí')}<br><small>${e.message}</small></div>`;
+  }
+}
+
+loadWeather();
+setInterval(loadWeather, 30 * 60 * 1000);
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('storage', e => {
+  if (e.key === 'ks-weather-loc') loadWeather();
+});
+
+// Při změně motivu aktualizuj glow supáka bez nového načtení počasí
+window.addEventListener('storage', e => {
+  if (e.key !== 'ks-theme') return;
+  const supEl = document.getElementById('wx-sup');
+  if (!supEl) return;
+  const themeId = e.newValue || 'gold';
+  const themeCol = (typeof KS_THEMES !== 'undefined' && KS_THEMES[themeId]?.vars?.['--gold']) || '#c8a03c';
+  const themeBg2 = (typeof KS_THEMES !== 'undefined' && KS_THEMES[themeId]?.cardBg) || null;
+  const wxCard = document.getElementById('wx-card');
+  if (wxCard && themeBg2) wxCard.style.background = themeBg2;
+  const current = supEl.dataset.wxState || 'sunny';
+  const atmosMap = {
+    rain:  'drop-shadow(0 4px 20px rgba(80,140,255,0.6)) drop-shadow(0 0 12px rgba(60,120,220,0.4))',
+    storm: 'drop-shadow(0 4px 20px rgba(160,80,255,0.6)) drop-shadow(0 0 12px rgba(140,60,220,0.4))',
+    snow:  'drop-shadow(0 4px 20px rgba(160,210,255,0.6)) drop-shadow(0 0 12px rgba(120,180,255,0.4))',
+    fog:   'drop-shadow(0 4px 16px rgba(160,160,180,0.5)) drop-shadow(0 0 10px rgba(140,140,160,0.3))',
+  };
+  supEl.style.filter = atmosMap[current] || `drop-shadow(0 4px 20px ${themeCol}88) drop-shadow(0 0 12px ${themeCol}55)`;
+});
+
+// Když se přepne jazyk, přepočítej a znovu vykresli hlášky/popisy (bez nového dotazu na API by šlo,
+// ale je to nejjednodušší a nejspolehlivější — data se jen znovu vyrenderují ze stejné odpovědi)
+window.addEventListener('ks-lang-applied', loadWeather);
+
+// ── TEST PŘEPÍNAČ ──
+function testState(code, wind, precip, temp) {
+  const fakeData = {
+    current: {
+      temperature_2m: temp,
+      apparent_temperature: temp - 2,
+      weather_code: code,
+      wind_speed_10m: wind,
+      relative_humidity_2m: 70,
+      precipitation: precip,
+    },
+    daily: {
+      time: ['2026-06-28','2026-06-29','2026-06-30','2026-07-01'],
+      temperature_2m_max: [temp+3, temp+2, temp-1, temp+4],
+      temperature_2m_min: [temp-8, temp-7, temp-6, temp-5],
+      weather_code: [code, 1, 3, 61],
+    }
+  };
+  renderWeather(fakeData);
+}
+</script>
+
+</body>
+</html>

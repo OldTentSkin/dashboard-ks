@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — To-Do Widget</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-glow: rgba(200,160,60,0.1);
+    --gold-text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --p1: #c04040;
+    --p2: #c8a03c;
+    --p3: #4a7a4a;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html {
+    height: 100%;
+  }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0;
+    margin: 0;
+  }
+
+  .todo-card {
+    width: 100%;
+    height: 100%;
+    border-radius: 18px;
+    padding: 10px 14px;
+    position: relative;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    display: flex;
+    flex-direction: column;
+  }
+  .todo-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  /* Header */
+  .todo-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .todo-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: #f0d890;
+    text-transform: uppercase;
+    font-family: var(--sans);
+    font-weight: 600;
+    text-shadow: 0 0 8px rgba(240,216,80,0.4);
+  }
+  .todo-total {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  /* Progress */
+  .todo-progress {
+    height: 2px;
+    background: rgba(200,160,60,0.1);
+    border-radius: 2px;
+    margin-bottom: 6px;
+    overflow: hidden;
+  }
+  .todo-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--p3), var(--gold));
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  /* Kategorie slider */
+  .cat-slider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .cat-arrow {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(200,160,60,0.25);
+    color: rgba(200,160,60,0.6);
+    width: 26px; height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    font-family: var(--mono);
+  }
+  .cat-arrow:hover { border-color: var(--gold); color: var(--gold); }
+  .cat-arrow:disabled { opacity: 0.2; cursor: default; }
+  .cat-current {
+    flex: 1;
+    background: rgba(0,0,0,0.45);
+    border: 1px solid var(--gold);
+    border-radius: 10px;
+    padding: 5px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .cat-current-name {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 1px;
+  }
+  .cat-current-count {
+    background: var(--gold);
+    color: #000;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-family: var(--sans);
+    min-width: 24px;
+    text-align: center;
+  }
+  .cat-dots {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin-bottom: 5px;
+  }
+  .cat-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: rgba(200,160,60,0.2);
+    transition: all 0.2s;
+  }
+  .cat-dot.active {
+    background: var(--gold);
+    width: 14px;
+    border-radius: 3px;
+  }
+
+  /* Přidat kategorii inline */
+  .cat-new-row {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .cat-new-row.open { display: flex; }
+  .cat-new-input {
+    flex: 1;
+    background: rgba(200,160,60,0.06);
+    border: none;
+    border-bottom: 1px solid var(--gold-dim);
+    color: var(--gold-text);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 6px;
+    outline: none;
+  }
+  .cat-new-input::placeholder { color: var(--text-dim); }
+  .cat-new-ok {
+    background: rgba(200,160,60,0.15);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .cat-del-btn {
+    background: transparent;
+    border: none;
+    color: rgba(192,64,64,0.4);
+    font-size: 10px;
+    cursor: pointer;
+    padding: 0 2px;
+    transition: color 0.15s;
+  }
+  .cat-del-btn:hover { color: var(--p1); }
+
+  /* Seznam úkolů */
+  .todo-list {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(200,160,60,0.5) rgba(200,160,60,0.08);
+  }
+  .todo-list::-webkit-scrollbar { width: 6px; }
+  .todo-list::-webkit-scrollbar-track { background: rgba(200,160,60,0.08); border-radius: 3px; }
+  .todo-list::-webkit-scrollbar-thumb { background: rgba(200,160,60,0.5); border-radius: 3px; }
+  .todo-list::-webkit-scrollbar-thumb:hover { background: rgba(200,160,60,0.8); }
+
+  .todo-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 4px;
+    border-bottom: 1px solid rgba(200,160,60,0.07);
+    position: relative;
+    border-radius: 4px;
+    transition: opacity 0.4s, transform 0.4s;
+  }
+  .todo-item:last-child { border-bottom: none; }
+  .todo-item:hover { background: rgba(200,160,60,0.04); }
+  .todo-item.removing {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  .todo-bar {
+    width: 3px;
+    align-self: stretch;
+    border-radius: 2px;
+    margin-right: 10px;
+    flex-shrink: 0;
+    min-height: 24px;
+  }
+  .p1 .todo-bar { background: var(--p1); }
+  .p2 .todo-bar { background: var(--p2); }
+  .p3 .todo-bar { background: var(--p3); }
+
+  .todo-check {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    border: 1px solid;
+    flex-shrink: 0;
+    margin-right: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .p1 .todo-check { border-color: var(--p1); color: var(--p1); }
+  .p2 .todo-check { border-color: var(--p2); color: var(--p2); }
+  .p3 .todo-check { border-color: var(--p3); color: var(--p3); }
+  .todo-item.done .todo-check { color: #fff; }
+  .todo-item.done.p1 .todo-check { background: var(--p1); border-color: var(--p1); }
+  .todo-item.done.p2 .todo-check { background: var(--p2); border-color: var(--p2); }
+  .todo-item.done.p3 .todo-check { background: var(--p3); border-color: var(--p3); }
+
+  .todo-text {
+    flex: 1;
+    font-size: 11px;
+    line-height: 1.4;
+    transition: color 0.2s;
+  }
+  .p1 .todo-text { color: #e07070; }
+  .p2 .todo-text { color: var(--gold); }
+  .p3 .todo-text { color: #80a880; }
+  .todo-item.done .todo-text { text-decoration: line-through; color: var(--text-dim) !important; }
+
+  .todo-actions {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .todo-item:hover .todo-actions { opacity: 1; }
+  .todo-btn {
+    background: transparent; border: none;
+    font-size: 10px; cursor: pointer;
+    color: var(--text-dim); padding: 2px 4px;
+    border-radius: 3px;
+    transition: color 0.15s;
+    font-family: var(--mono);
+  }
+  .todo-btn:hover { color: var(--gold); }
+  .todo-btn.del:hover { color: var(--p1); }
+  .todo-btn.cal:hover { color: #4285f4; }
+
+  /* Date picker popup */
+  .cal-popup {
+    display: none;
+    position: absolute;
+    right: 0; top: 100%;
+    background: #1a1408;
+    border: 1px solid var(--gold-dim);
+    border-radius: 8px;
+    padding: 10px;
+    z-index: 100;
+    gap: 6px;
+    flex-direction: column;
+    width: 200px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  }
+  .cal-popup.open { display: flex; }
+  .cal-popup input[type="datetime-local"] {
+    background: rgba(200,160,60,0.06);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold-text);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    outline: none;
+    width: 100%;
+    color-scheme: dark;
+  }
+  .cal-popup-ok {
+    background: rgba(66,133,244,0.2);
+    border: 1px solid rgba(66,133,244,0.4);
+    color: #4285f4;
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .cal-popup-ok:hover { background: rgba(66,133,244,0.3); }
+
+  /* Edit inline */
+  .todo-edit-row {
+    display: none;
+    padding: 5px 0 5px 13px;
+    gap: 6px;
+    align-items: center;
+    border-bottom: 1px solid rgba(200,160,60,0.08);
+  }
+  .todo-edit-row.open { display: flex; }
+  .todo-edit-input {
+    flex: 1;
+    background: rgba(200,160,60,0.06);
+    border: none;
+    border-bottom: 1px solid var(--gold-dim);
+    color: var(--gold-text);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 6px;
+    outline: none;
+  }
+  .todo-edit-pri {
+    background: rgba(200,160,60,0.06);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold-text);
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 3px 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    outline: none;
+  }
+  .todo-edit-save {
+    background: rgba(200,160,60,0.15);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  /* Přidat úkol */
+  .todo-add-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding-top: 6px;
+    padding-right: 10px;
+    border-top: 1px solid rgba(200,160,60,0.1);
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+  }
+  .todo-add-input {
+    flex: 0 1 60%;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 4px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .todo-add-input:focus { border-color: var(--gold); }
+  .todo-add-input::placeholder { color: var(--text-dim); }
+  .todo-add-pri { display: none; }
+  .pri-picker {
+    display: flex; gap: 3px; flex-shrink: 0;
+  }
+  .pri-btn {
+    width: 28px; height: 26px; border-radius: 5px;
+    border: 1px solid rgba(200,160,60,0.2);
+    background: transparent; cursor: pointer;
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    color: var(--text-dim); transition: all 0.12s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pri-btn[data-pri="p1"] { border: 3px solid rgba(220,80,80,0.5); }
+  .pri-btn[data-pri="p2"] { border: 3px solid rgba(200,160,60,0.5); }
+  .pri-btn[data-pri="p3"] { border: 3px solid rgba(80,160,80,0.5); }
+  .pri-btn[data-pri="p1"].active { background: rgba(220,80,80,0.2); border-color: #e07070; color: #e07070; }
+  .pri-btn[data-pri="p2"].active { background: rgba(200,160,60,0.2); border-color: var(--gold); color: var(--gold); }
+  .pri-btn[data-pri="p3"].active { background: rgba(80,160,80,0.2); border-color: #80a880; color: #80a880; }
+  .todo-add-btn {
+    background: rgba(200,160,60,0.12);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 1px 9px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .todo-add-btn:hover { background: rgba(200,160,60,0.22); }
+
+  .todo-empty {
+    text-align: center;
+    padding: 16px;
+    color: var(--text-dim);
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+</style>
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+</head>
+<body>
+
+<div class="todo-card">
+  <div class="todo-header">
+    <div class="todo-label" data-i18n="todo.title">To-Do</div>
+    <div class="todo-total" id="todo-total">0 úkolů</div>
+  </div>
+
+  <div class="todo-progress">
+    <div class="todo-progress-fill" id="todo-progress" style="width:0%"></div>
+  </div>
+
+  <!-- Kategorie slider -->
+  <div class="cat-slider">
+    <button class="cat-arrow" id="cat-prev">‹</button>
+    <div class="cat-current" id="cat-current">
+      <span class="cat-current-name" id="cat-name" data-i18n="common.all">Vše</span>
+      <span class="cat-current-count" id="cat-count-badge">0</span>
+    </div>
+    <button class="cat-arrow" id="cat-next">›</button>
+  </div>
+  <div class="cat-dots" id="cat-dots"></div>
+  <div class="cat-new-row" id="cat-new-row">
+    <input class="cat-new-input" id="cat-new-input" placeholder="název kategorie..." data-i18n-placeholder="common.categoryNamePlaceholder" maxlength="30">
+    <button class="cat-new-ok" id="cat-new-ok">+ <span data-i18n="common.add">přidat</span></button>
+  </div>
+
+  <div class="todo-list" id="todo-list"></div>
+
+  <div class="todo-add-row" style="padding-right:2px;">
+    <input class="todo-add-input" id="todo-add-input" placeholder="+ nový úkol..." data-i18n-placeholder="todo.addTaskPlaceholderPlus" maxlength="120">
+    <select class="todo-add-pri" id="todo-add-pri">
+      <option value="p2">P2</option>
+      <option value="p1">P1</option>
+      <option value="p3">P3</option>
+    </select>
+    <div class="pri-picker" id="pri-picker">
+      <button type="button" class="pri-btn" data-pri="p1">P1</button>
+      <button type="button" class="pri-btn active" data-pri="p2">P2</button>
+      <button type="button" class="pri-btn" data-pri="p3">P3</button>
+    </div>
+    <button class="todo-add-btn" id="todo-add-btn">+</button>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'ks-todo-v2';
+let data = { categories: [], todos: [] };
+let activecat = 'all';
+
+function load() {
+  try { data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || { categories: [], todos: [] }; }
+  catch { data = { categories: [], todos: [] }; }
+  if (!data.categories.length) {
+    data.categories = [
+      { id: 'work', name: ksT('todo.categories.work', 'Práce') },
+      { id: 'personal', name: ksT('todo.categories.personal', 'Osobní') },
+      { id: 'project', name: ksT('todo.categories.project', 'Projekt') },
+    ];
+    data.todos = [
+      { id: 1, text: ksT('todo.samples.setupDrive', 'Nastavit Google Drive'), priority: 'p1', cat: 'project' },
+      { id: 2, text: ksT('todo.samples.chooseTheme', 'Vybrat téma dashboardu'), priority: 'p2', cat: 'project' },
+      { id: 3, text: ksT('todo.samples.addRss', 'Přidat RSS kanály'), priority: 'p3', cat: 'project' },
+      { id: 4, text: ksT('todo.samples.callAccountant', 'Zavolat účetní'), priority: 'p2', cat: 'work' },
+    ];
+    save();
+  }
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  try { localStorage.setItem('ks-mob-todo', JSON.stringify({ count: data.todos.length, priorities: data.todos.map(t => t.priority) })); } catch {}
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Výchozí kategorie (work/personal/project) se překládají podle aktuálního jazyka;
+// kategorie, které si uživatel přidá sám, se nepřekládají (je to jeho vlastní text).
+const DEFAULT_CAT_LABEL_KEYS = {
+  work: 'todo.categories.work',
+  personal: 'todo.categories.personal',
+  project: 'todo.categories.project',
+};
+function catLabel(cat) {
+  const key = DEFAULT_CAT_LABEL_KEYS[cat.id];
+  return key ? ksT(key, cat.name) : cat.name;
+}
+
+// ── SLIDER KATEGORIÍ ──
+// Sestavit seznam: [all, ...categories]
+function getCatList() {
+  return [{ id: 'all', name: ksT('common.all', 'Vše') }, ...data.categories];
+}
+
+function getCatIndex() {
+  const list = getCatList();
+  const idx = list.findIndex(c => c.id === activecat);
+  return idx >= 0 ? idx : 0;
+}
+
+function renderCats() {
+  const list = getCatList();
+  const idx = getCatIndex();
+  const cur = list[idx];
+  const count = cur.id === 'all' ? data.todos.length : data.todos.filter(t => t.cat === cur.id).length;
+
+  document.getElementById('cat-name').textContent = catLabel(cur);
+  document.getElementById('cat-count-badge').textContent = count;
+
+  // Šipky vždy aktivní (wrap around)
+  // prev/next disabled se nepoužívá
+
+  // Tečky
+  const dots = document.getElementById('cat-dots');
+  dots.innerHTML = list.map((c, i) =>
+    `<div class="cat-dot ${i===idx?'active':''}"></div>`
+  ).join('');
+
+  // Smazat kategorii (ne pro "Vše")
+  const curDiv = document.getElementById('cat-current');
+  let delBtn = curDiv.querySelector('.cat-del-inline');
+  if (delBtn) delBtn.remove();
+  if (cur.id !== 'all') {
+    delBtn = document.createElement('button');
+    delBtn.className = 'cat-del-inline';
+    delBtn.style.cssText = 'background:transparent;border:none;color:rgba(192,64,64,0.5);font-size:12px;cursor:pointer;margin-left:8px;padding:0 2px;transition:color 0.15s;';
+    delBtn.title = ksT('common.deleteCategory', 'Smazat kategorii');
+    delBtn.textContent = '✕';
+    delBtn.onmouseover = () => delBtn.style.color = '#c04040';
+    delBtn.onmouseout = () => delBtn.style.color = 'rgba(192,64,64,0.5)';
+    delBtn.onclick = () => {
+      if (data.todos.some(t => t.cat === cur.id)) {
+        if (!confirm(ksT('todo.confirmDeleteCategory', 'Kategorie obsahuje úkoly — opravdu smazat?'))) return;
+        data.todos = data.todos.filter(t => t.cat !== cur.id);
+      }
+      data.categories = data.categories.filter(c => c.id !== cur.id);
+      activecat = 'all';
+      save(); renderCats(); renderTodos();
+    };
+    document.getElementById('cat-count-badge').after(delBtn);
+  }
+}
+
+document.getElementById('cat-prev').addEventListener('click', () => {
+  const list = getCatList();
+  const idx = getCatIndex();
+  activecat = list[(idx - 1 + list.length) % list.length].id;
+  renderCats(); renderTodos();
+});
+
+document.getElementById('cat-next').addEventListener('click', () => {
+  const list = getCatList();
+  const idx = getCatIndex();
+  activecat = list[(idx + 1) % list.length].id;
+  renderCats(); renderTodos();
+});
+
+// Přidat kategorii
+document.getElementById('cat-new-ok').addEventListener('click', addCat);
+document.getElementById('cat-new-input').addEventListener('keydown', e => { if (e.key === 'Enter') addCat(); });
+
+function addCat() {
+  const input = document.getElementById('cat-new-input');
+  const name = input.value.trim();
+  if (!name) return;
+  const id = 'cat_' + Date.now();
+  data.categories.push({ id, name });
+  input.value = '';
+  document.getElementById('cat-new-row').classList.remove('open');
+  save(); renderCats(); renderTodos();
+}
+
+// ── RENDER TODOS ──
+function renderTodos() {
+  const list = document.getElementById('todo-list');
+  const filtered = activecat === 'all' ? data.todos : data.todos.filter(t => t.cat === activecat);
+  const total = data.todos.length;
+
+  document.getElementById('todo-total').textContent = `${total} ${total===1 ? ksT('todo.taskSingular','úkol') : ksT('todo.tasksCount','úkolů')}`;
+  document.getElementById('todo-progress').style.width = '0%';
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="todo-empty">${ksT('common.empty', '// žádné úkoly')}</div>`;
+    return;
+  }
+
+  // Seřadit: P1 nahoře
+  const sorted = [...filtered].sort((a,b) => {
+    const o = {p1:0, p2:1, p3:2};
+    return (o[a.priority]||1) - (o[b.priority]||1);
+  });
+
+  list.innerHTML = sorted.map(t => `
+    <div class="todo-item ${t.priority}" data-id="${t.id}">
+      <div class="todo-bar"></div>
+      <div class="todo-check" data-check="${t.id}"></div>
+      <div class="todo-text">${escHtml(t.text)}</div>
+      <div class="todo-actions" style="position:relative;">
+        <button class="todo-btn cal" data-cal="${t.id}" title="${ksT('todo.addToGoogleCalendar','Přidat do Google Kalendáře')}">📅</button>
+        <button class="todo-btn" data-edit="${t.id}">✎</button>
+        <button class="todo-btn del" data-del="${t.id}">✕</button>
+        <div class="cal-popup" id="cal-${t.id}">
+          <div style="font-size:9px;color:var(--text-dim);letter-spacing:1px;">${ksT('todo.dateAndTime','DATUM A ČAS')}</div>
+          <input type="datetime-local" id="cal-dt-${t.id}">
+          <button class="cal-popup-ok" data-calok="${t.id}">📅 ${ksT('todo.openGoogleCalendar','Otevřít Google Kalendář')}</button>
+        </div>
+      </div>
+    </div>
+    <div class="todo-edit-row" id="edit-${t.id}">
+      <input class="todo-edit-input" id="edit-input-${t.id}" value="${escHtml(t.text)}" maxlength="120">
+      <select class="todo-edit-pri" id="edit-pri-${t.id}">
+        <option value="p1" ${t.priority==='p1'?'selected':''}>P1</option>
+        <option value="p2" ${t.priority==='p2'?'selected':''}>P2</option>
+        <option value="p3" ${t.priority==='p3'?'selected':''}>P3</option>
+      </select>
+      <button class="todo-edit-save" data-save="${t.id}">OK</button>
+    </div>
+  `).join('');
+
+  // Eventy
+  list.querySelectorAll('[data-check]').forEach(el => {
+    el.addEventListener('click', () => toggleDone(parseInt(el.dataset.check)));
+  });
+  list.querySelectorAll('[data-del]').forEach(el => {
+    el.addEventListener('click', () => deleteTodo(parseInt(el.dataset.del)));
+  });
+  list.querySelectorAll('[data-edit]').forEach(el => {
+    el.addEventListener('click', () => openEdit(parseInt(el.dataset.edit)));
+  });
+  list.querySelectorAll('[data-save]').forEach(el => {
+    el.addEventListener('click', () => saveEdit(parseInt(el.dataset.save)));
+  });
+
+  // Kalendář - otevřít popup
+  list.querySelectorAll('[data-cal]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = el.dataset.cal;
+      // Zavři ostatní
+      document.querySelectorAll('.cal-popup.open').forEach(p => p.classList.remove('open'));
+      const popup = document.getElementById('cal-' + id);
+      if (popup) {
+        // Přednastavit datum na zítra 9:00
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(9, 0, 0, 0);
+        const dt = tomorrow.toISOString().slice(0,16);
+        const dtInput = document.getElementById('cal-dt-' + id);
+        if (dtInput) dtInput.value = dt;
+        popup.classList.add('open');
+      }
+    });
+  });
+
+  // Kalendář - otevřít Google
+  list.querySelectorAll('[data-calok]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = el.dataset.calok;
+      const todo = data.todos.find(t => t.id == id);
+      const dtInput = document.getElementById('cal-dt-' + id);
+      if (!todo || !dtInput?.value) return;
+      const start = new Date(dtInput.value);
+      const end = new Date(start.getTime() + 60*60*1000); // +1 hodina
+      const fmt = d => d.toISOString().replace(/[-:]/g,'').slice(0,15) + 'Z';
+      const url = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+        + '&text=' + encodeURIComponent(todo.text)
+        + '&dates=' + fmt(start) + '/' + fmt(end);
+      window.open(url, '_blank');
+      document.getElementById('cal-' + id)?.classList.remove('open');
+    });
+  });
+
+  // Zavřít popup klikem mimo
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.cal-popup.open').forEach(p => p.classList.remove('open'));
+  });
+}
+
+// ── AKCE ──
+function toggleDone(id) {
+  const item = document.querySelector(`.todo-item[data-id="${id}"]`);
+  if (!item) return;
+  item.classList.add('done');
+  item.querySelector('.todo-check').textContent = '✓';
+  setTimeout(() => {
+    item.classList.add('removing');
+    setTimeout(() => {
+      data.todos = data.todos.filter(t => t.id !== id);
+      save(); renderCats(); renderTodos();
+    }, 400);
+  }, 2000);
+}
+
+function deleteTodo(id) {
+  data.todos = data.todos.filter(t => t.id !== id);
+  save(); renderCats(); renderTodos();
+}
+
+function openEdit(id) {
+  document.querySelectorAll('.todo-edit-row.open').forEach(r => r.classList.remove('open'));
+  const row = document.getElementById(`edit-${id}`);
+  if (row) { row.classList.add('open'); document.getElementById(`edit-input-${id}`)?.focus(); }
+}
+
+function saveEdit(id) {
+  const input = document.getElementById(`edit-input-${id}`);
+  const pri = document.getElementById(`edit-pri-${id}`);
+  const t = data.todos.find(x => x.id === id);
+  if (t && input?.value.trim()) {
+    t.text = input.value.trim();
+    t.priority = pri.value;
+    save(); renderCats(); renderTodos();
+  }
+}
+
+// Přidat úkol
+document.getElementById('todo-add-btn').addEventListener('click', addTodo);
+document.getElementById('todo-add-input').addEventListener('keydown', e => { if (e.key === 'Enter') addTodo(); });
+
+function addTodo() {
+  const input = document.getElementById('todo-add-input');
+  const pri = document.getElementById('todo-add-pri');
+  // Pri-picker — synchronizace s hidden selectem
+  const priPicker = document.getElementById('pri-picker');
+  if (priPicker) {
+    priPicker.querySelectorAll('.pri-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        priPicker.querySelectorAll('.pri-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        pri.value = btn.dataset.pri;
+      });
+    });
+  }
+    const text = input.value.trim();
+  if (!text) return;
+  const cat = activecat === 'all' ? (data.categories[0]?.id || 'none') : activecat;
+  data.todos.push({ id: Date.now(), text, priority: pri.value, cat });
+  input.value = '';
+  save(); renderCats(); renderTodos();
+}
+
+load();
+try { localStorage.setItem('ks-mob-todo', JSON.stringify({ count: data.todos.length, priorities: data.todos.map(t => t.priority) })); } catch {}
+renderCats();
+renderTodos();
+
+// Když se přepne jazyk, překresli texty
+window.addEventListener('ks-lang-applied', () => { renderCats(); renderTodos(); });
+</script>
+</body>
+</html>

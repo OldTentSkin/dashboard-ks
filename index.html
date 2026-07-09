@@ -1,0 +1,1666 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --bg: #030303;
+    --gap: 8px;
+    --pad: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--page-bg, var(--bg));
+    overflow: hidden;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* ── OUTER — černé boky ── */
+  .outer {
+    display: flex;
+    align-items: stretch;
+    height: 100vh;
+    padding: 16px 0;
+    gap: 0;
+  }
+
+  .side-pad { width: clamp(40px, 8vw, 160px); flex-shrink: 0; }
+
+  /* ── BENTO GRID ── */
+  .bento {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 2fr;
+    grid-template-rows: 1fr 1.4fr 1fr 0.85fr;
+    gap: var(--gap);
+    min-width: 0;
+    position: relative;
+  }
+
+  /* ── TILE ── */
+  .tile {
+    border-radius: 14px;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+  }
+  .flip-front { position: relative; }
+  .tile::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+    pointer-events: none;
+  }
+  .tile iframe {
+    width: 100%; height: 100%;
+    border: none; display: block;
+  }
+
+  /* Grid pozice */
+  .bl-weather  { grid-column: 1; grid-row: 1 / 3; }
+  .bl-clock    { grid-column: 2; grid-row: 1; }
+  .bl-agenda   { grid-column: 3; grid-row: 1; }
+  .bl-cal      { grid-column: 4; grid-row: 1 / 4; overflow: hidden; }
+  .bl-todo     { grid-column: 2 / 4; grid-row: 2; }
+  .bl-rss      { grid-column: 1; grid-row: 3; }
+  .bl-youtube  { grid-column: 2; grid-row: 3; }
+  .bl-notes    { grid-column: 3; grid-row: 3; }
+  .bl-diary    { grid-column: 2 / 4; grid-row: 4; }
+  .bl-warranty { grid-column: 1; grid-row: 4; }
+  .bl-shopping { grid-column: 4; grid-row: 4; }
+
+  /* ── FLIP TILE ── */
+  .flip-tile {
+    border-radius: 14px;
+    border: 1px solid var(--gold-dim);
+    overflow: hidden;
+    position: relative;
+    perspective: 1200px;
+    min-height: 0;
+  }
+  .flip-inner {
+    position: relative;
+    width: 100%; height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .flip-inner.flipped { transform: rotateY(180deg); }
+
+  .flip-front, .flip-back {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .flip-front {
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    border: 1px solid var(--gold-dim);
+  }
+  .flip-back {
+    transform: rotateY(180deg);
+    background: var(--card-bg, radial-gradient(ellipse at 100% 100%, #c89820 0%, #6a4a00 25%, #1a1000 55%, #000000 100%));
+    border: 1px solid var(--gold-dim);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 10px;
+  }
+  .flip-front iframe { width: 100%; height: 100%; border: none; display: block; }
+
+  .flip-back-deco {
+    position: absolute;
+    border: 1px solid rgba(200,160,60,0.07);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .flip-back-logo {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: clamp(16px, 2vw, 28px);
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 4px;
+    text-shadow: 0 0 18px rgba(200,160,60,0.3);
+    opacity: 0.6;
+    z-index: 1;
+  }
+  .flip-back-sub {
+    font-size: clamp(8px, 0.8vw, 11px);
+    color: rgba(200,160,60,0.3);
+    letter-spacing: 3px;
+    z-index: 1;
+  }
+  .flip-btn {
+    position: absolute;
+    bottom: 7px; right: 7px;
+    z-index: 10;
+    background: rgba(200,160,60,0.08);
+    border: 1px solid rgba(200,160,60,0.2);
+    color: rgba(200,160,60,0.5);
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .flip-btn:hover { background: rgba(200,160,60,0.18); border-color: var(--gold); color: var(--gold); }
+
+  /* ── PIN — pinnutý tile se roztáhne, jen reálně překrývající bloky se schovají ── */
+  .tile.hidden-by-pin,
+  .flip-tile.hidden-by-pin {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .bento.pin-active .tile.pinned,
+  .bento.pin-active .flip-tile.pinned {
+    visibility: visible;
+    pointer-events: all;
+    grid-column: 2 / 4 !important;
+    grid-row: 2 / 5 !important;
+    z-index: 10;
+    animation: pinZoomIn 0.25s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  }
+  .bento.pin-active .tile.pinned .pin-btn,
+  .bento.pin-active .flip-tile.pinned .pin-btn {
+    visibility: visible;
+    pointer-events: all;
+    z-index: 20;
+    background: rgba(0,0,0,0.5);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  .bento.pin-active .flip-tile.pinned .flip-btn {
+    visibility: visible;
+    pointer-events: all;
+    z-index: 20;
+  }
+
+  @keyframes pinZoomIn {
+    from { transform: scale(0.95); opacity: 0.5; }
+    to   { transform: scale(1);    opacity: 1; }
+  }
+
+  /* ── PIN TLAČÍTKO ── */
+  .pin-btn {
+    position: absolute;
+    top: 6px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(200,160,60,0.4);
+    color: rgba(232,217,176,0.85);
+    width: 26px; height: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 9px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .pin-btn::before {
+    content: '';
+    width: 12px; height: 2px;
+    border-radius: 1px;
+    background: currentColor;
+  }
+  .pin-btn:hover { background: rgba(200,160,60,0.25); border-color: var(--gold); color: var(--gold); transform: translateX(-50%) scale(1.08); }
+  .pin-btn.active { background: rgba(0,0,0,0.5); border-color: var(--gold); color: var(--gold); }
+
+  /* ── ANIMACE PŘÍJEZDU ── */
+  /* Sloupce 1 a 4 jedou ze shora */
+  .col-top {
+    animation: slideFromTop 1.05s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  }
+  /* Sloupce 2 a 3 jedou ze spoda */
+  .col-bot {
+    animation: slideFromBot 1.05s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  }
+
+  @keyframes slideFromTop {
+    from { transform: translateY(-110vh); opacity: 0; }
+    to   { transform: translateY(0);      opacity: 1; }
+  }
+  @keyframes slideFromBot {
+    from { transform: translateY(110vh);  opacity: 0; }
+    to   { transform: translateY(0);      opacity: 1; }
+  }
+
+  /* Zpoždění per řádek aby to bylo hezké */
+  .bl-weather  { animation-delay: 0s; }
+  .bl-clock    { animation-delay: 0.05s; }
+  .bl-agenda   { animation-delay: 0.05s; }
+  .bl-cal      { animation-delay: 0s; }
+  .bl-todo     { animation-delay: 0.1s; }
+  .bl-rss      { animation-delay: 0.05s; }
+  .bl-youtube  { animation-delay: 0.15s; }
+  .bl-notes    { animation-delay: 0.15s; }
+  .bl-diary    { animation-delay: 0.2s; }
+  .bl-warranty { animation-delay: 0.1s; }
+  .bl-shopping { animation-delay: 0.05s; }
+
+
+
+  /* Hodiny — flip sekund */
+  .mbc-clk-secs {
+    font-size: 9px; color: rgba(200,160,60,0.5);
+    letter-spacing: 2px; margin-top: 2px; perspective: 100px;
+  }
+  .mbc-clk-sec-val {
+    display: inline-block;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+  .mbc-clk-sec-val.flip {
+    transform: rotateX(90deg); opacity: 0.2;
+  }
+
+  /* To-Do kategorie */
+  .mbc-todo-cats {
+    display: flex; align-items: center; gap: 4px;
+    width: 100%; margin-top: 4px; pointer-events: all;
+  }
+  .mbc-cat-arrow {
+    background: transparent; border: 1px solid rgba(200,160,60,0.2);
+    color: rgba(200,160,60,0.5); font-size: 10px;
+    width: 18px; height: 18px; border-radius: 4px;
+    cursor: pointer; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center;
+  }
+  .mbc-cat-name {
+    flex: 1; text-align: center; font-size: 8px; letter-spacing: 1px;
+    color: var(--gold, #c8a03c); font-family: 'Rajdhani', sans-serif;
+    font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .mbc-cat-count {
+    font-size: 7px; color: rgba(200,160,60,0.5); flex-shrink: 0;
+  }
+
+  /* RSS zdroje */
+  .mbc-sources {
+    display: flex; flex-direction: column; gap: 2px;
+    width: 100%; margin-top: 3px; pointer-events: all;
+    max-height: 55%; overflow: hidden;
+  }
+  .mbc-source-row {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 7px; color: rgba(232,217,176,0.65);
+    letter-spacing: 0.5px;
+  }
+  .mbc-source-dot {
+    width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+  }
+  .mbc-source-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* YouTube kanály */
+  .mbc-yt-channels {
+    display: flex; flex-direction: column; gap: 2px;
+    width: 100%; margin-top: 3px;
+    max-height: 55%; overflow: hidden;
+  }
+  .mbc-yt-row {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 7px; color: rgba(232,217,176,0.65);
+  }
+  .mbc-yt-av {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: rgba(200,160,60,0.15);
+    font-size: 6px; display: flex; align-items: center; justify-content: center;
+    color: var(--gold, #c8a03c); flex-shrink: 0;
+    font-family: 'Rajdhani', sans-serif; font-weight: 700;
+  }
+  .mbc-yt-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Kalendář — horní polovina mini grid, dolní polovina události */
+  .mob-card-cal { justify-content: center; align-items: center; }
+  .mbc-cal-bigdate {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .mbc-cal-day-num {
+    font-family: 'Rajdhani', sans-serif; font-size: 40px; font-weight: 700;
+    color: var(--gold, #c8a03c); line-height: 1;
+    text-shadow: 0 0 10px rgba(200,160,60,0.4);
+  }
+  .mbc-cal-dayname {
+    font-size: 9px; letter-spacing: 1.5px; color: var(--gold, #c8a03c);
+    text-transform: uppercase; margin-top: 3px; opacity: 0.85;
+  }
+  .mbc-cal-month-name {
+    font-size: 9px; letter-spacing: 2px; color: rgba(232,217,176,0.6);
+    text-transform: uppercase; margin-top: 2px;
+  }
+  .mbc-preview {
+    font-size: 8px; color: rgba(232,217,176,0.6); letter-spacing: 0.3px;
+    margin-top: 4px; max-width: 96%; text-align: center;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* Poznámky — centrovat nadpis */
+  #mbc-notes, #mbc-youtube, #mbc-rss, #mbc-agenda {
+    justify-content: flex-start;
+    padding-top: 10px;
+  }
+  /* ── MOB-CARDS: skryté na desktopu, viditelné na mobilu místo iframů ── */
+  .mob-card {
+    display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    width: 100%; height: 100%; padding: 4px; text-align: center;
+    pointer-events: none;
+  }
+  .mbc-title {
+    font-family: 'Rajdhani', sans-serif; font-size: 9px; font-weight: 700;
+    letter-spacing: 2px; color: var(--gold, #c8a03c); text-transform: uppercase;
+    margin-bottom: 2px; opacity: 0.7;
+  }
+  .mbc-count {
+    font-family: 'Rajdhani', sans-serif; font-size: 26px; font-weight: 700;
+    color: var(--gold, #c8a03c); line-height: 1;
+    text-shadow: 0 0 10px rgba(200,160,60,0.4);
+  }
+  .mbc-sub {
+    font-size: 8px; color: rgba(232,217,176,0.5); letter-spacing: 1px; margin-top: 2px;
+  }
+  /* Počasí */
+  .mbc-wx-img { width: 92%; min-width: 140px; object-fit: contain; margin-bottom: 4px; }
+  .mbc-wx-temp {
+    font-family: 'Rajdhani', sans-serif; font-size: 28px; font-weight: 700;
+    color: var(--gold, #c8a03c); line-height: 1;
+  }
+  .mbc-wx-cond { font-size: 8px; color: rgba(232,217,176,0.6); letter-spacing: 1px; margin-top: 2px; }
+  .mbc-wx-forecast {
+    display: flex; gap: 8px; margin-top: 8px;
+    border-top: 1px solid rgba(200,160,60,0.15); padding-top: 6px;
+  }
+  .mbc-wx-fday {
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+  }
+  .mbc-wx-fday img { width: 18px; height: 18px; object-fit: contain; }
+  .mbc-wx-fmax { font-size: 9px; font-weight: 700; color: var(--gold, #c8a03c); }
+  .mbc-wx-fmin { font-size: 8px; color: rgba(232,217,176,0.45); }
+  /* Hodiny */
+  .mob-card-clock { gap: 0; }
+  .mbc-clk-h, .mbc-clk-m {
+    font-family: 'Rajdhani', sans-serif; font-size: 32px; font-weight: 700;
+    color: var(--gold, #c8a03c); line-height: 1.1;
+    text-shadow: 0 0 10px rgba(200,160,60,0.4);
+  }
+  .mbc-clk-sep { font-size: 14px; color: rgba(200,160,60,0.4); line-height: 0.6; }
+  /* Kalendář — velké datum místo mini mřížky */
+  .mob-card-cal { justify-content: center; padding: 4px 3px; gap: 0; }
+
+  @media (max-width: 768px) {
+    .tile > iframe,
+    .flip-front > iframe {
+      position: absolute; inset: 0;
+      opacity: 0; pointer-events: none;
+      z-index: 0;
+    }
+    .tile .mob-card,
+    .flip-front .mob-card {
+      display: flex;
+      position: absolute; inset: 0;
+      z-index: 2;
+    }
+  }
+  /* Skryto vždy — zobrazí se jen přes JS nebo na mobilu */
+  #mob-settings-bar { display: none; }
+  @media (max-width: 768px) {
+    #mob-settings-bar {
+      display: flex; align-items: center; justify-content: center;
+      height: calc(20dvh - 12px);
+    }
+    #mob-settings-bar button {
+      background: rgba(200,160,60,0.1);
+      border: 1px solid rgba(200,160,60,0.3);
+      color: var(--gold, #c8a03c);
+      font-size: 28px;
+      width: 54px; height: 54px;
+      border-radius: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    #mob-settings-bar button:active { background: rgba(200,160,60,0.22); }
+  }
+  #mob-overlay.open { display: flex; }
+
+  /* ── MOB FULLSCREEN OVERLAY ── */
+  #mob-overlay {
+    display: none;
+    position: fixed; z-index: 1000;
+    top: 0; left: 0; right: 0;
+    height: 80dvh;
+    flex-direction: column;
+    background: var(--page-bg, #030303);
+    border-bottom: 1px solid var(--gold-dim, rgba(200,160,60,0.3));
+    animation: mobSlideDown 0.22s cubic-bezier(0.2,0.8,0.3,1) both;
+  }
+  @keyframes mobSlideDown {
+    from { transform: translateY(-6%); opacity: 0.5; }
+    to   { transform: translateY(0);   opacity: 1; }
+  }
+  .mob-overlay-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; flex-shrink: 0;
+    border-bottom: 1px solid rgba(200,160,60,0.12);
+    background: rgba(0,0,0,0.5);
+  }
+  .mob-back-btn {
+    background: transparent; border: 1px solid rgba(200,160,60,0.25);
+    color: var(--gold, #c8a03c); font-size: 18px;
+    width: 34px; height: 34px; border-radius: 8px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .mob-overlay-title {
+    font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700;
+    letter-spacing: 2px; color: var(--gold, #c8a03c); text-transform: uppercase; flex: 1;
+  }
+  #mob-overlay iframe { flex: 1; width: 100%; border: none; display: block; min-height: 0; }
+  /* Volič stylu hodin v overlaye */
+  #mob-clock-styles {
+    display: none; flex-shrink: 0;
+    padding: 6px 10px; gap: 6px; align-items: center;
+    background: rgba(0,0,0,0.5);
+    border-top: 1px solid rgba(200,160,60,0.12);
+    overflow-x: auto; scrollbar-width: none;
+  }
+  #mob-clock-styles::-webkit-scrollbar { display: none; }
+  #mob-clock-styles.visible { display: flex; }
+  .mob-clock-opt {
+    flex-shrink: 0; padding: 5px 12px; border-radius: 8px;
+    border: 1px solid rgba(200,160,60,0.25); cursor: pointer;
+    font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 600;
+    letter-spacing: 1px; color: rgba(200,160,60,0.6);
+    background: transparent; text-transform: uppercase; white-space: nowrap;
+  }
+  .mob-clock-opt.active { border-color: var(--gold, #c8a03c); color: var(--gold, #c8a03c); background: rgba(200,160,60,0.1); }
+  @media (max-width: 768px) {
+    .tile, .flip-tile { cursor: pointer; }
+    .tile:active, .flip-tile:active { opacity: 0.82; transition: opacity 0.1s; }
+  }
+
+  /* ── MOBIL — stejná mřížka, jen bez postranních okrajů ── */
+  @media (max-width: 768px) {
+    html, body { overflow: hidden; height: 100%; }
+    #mob-view { display: none !important; }
+    .outer {
+      height: 80dvh;
+      padding: 6px 0;
+    }
+    .side-pad { width: 4px; }
+    .bento {
+      gap: 4px;
+      grid-template-rows: 0.6fr 0.9fr 1fr 0.85fr;
+    }
+    .tile, .flip-tile { border-radius: 8px; }
+    .col-top, .col-bot { animation: none; }
+    .pin-btn { display: none; }
+    .flip-btn { width: 18px; height: 18px; font-size: 9px; bottom: 4px; right: 4px; }
+    .flip-back-logo { font-size: 10px; letter-spacing: 2px; }
+    .flip-back-sub { font-size: 7px; letter-spacing: 1px; }
+
+    /* Zvětšené písmo (+30%) — vázáno na buňku, ne obsah */
+    .bl-todo .mbc-title, .bl-rss .mbc-title,
+    .bl-warranty .mbc-title, .bl-diary .mbc-title, .bl-shopping .mbc-title,
+    .bl-notes .mbc-title, .bl-youtube .mbc-title, .bl-agenda .mbc-title { font-size: 12px; }
+
+    .bl-todo .mbc-count, .bl-rss .mbc-count,
+    .bl-warranty .mbc-count, .bl-diary .mbc-count, .bl-shopping .mbc-count,
+    .bl-notes .mbc-count, .bl-youtube .mbc-count, .bl-agenda .mbc-count { font-size: 34px; }
+
+    .bl-todo .mbc-sub, .bl-rss .mbc-sub,
+    .bl-warranty .mbc-sub, .bl-diary .mbc-sub, .bl-shopping .mbc-sub,
+    .bl-notes .mbc-sub, .bl-youtube .mbc-sub, .bl-agenda .mbc-sub { font-size: 10px; }
+
+    .bl-todo .mbc-cat-name { font-size: 10px; }
+    .bl-todo .mbc-cat-count, .bl-todo .mbc-cat-arrow { font-size: 9px; }
+    .bl-rss .mbc-source-row { font-size: 9px; }
+    .bl-rss .mbc-source-dot { width: 7px; height: 7px; }
+  }
+</style>
+<script src="widgets/ks-defaults.js"></script>
+<script src="widgets/theme-loader.js"></script>
+<script src="widgets/test-banner.js"></script>
+<script src="widgets/cloud-sync.js"></script>
+<script src="widgets/auth-lock.js"></script>
+</head>
+<body>
+
+<div class="outer">
+  <div class="side-pad"></div>
+
+  <div class="bento">
+
+    <div class="tile bl-weather col-top">
+      <iframe src="widgets/weather-widget2.html" scrolling="no"></iframe>
+      <div class="mob-card" id="mbc-weather">
+        <img class="mbc-wx-img" id="mbc-wx-img" src="widgets/vultures8/sunny.png" alt="">
+        <div class="mbc-wx-temp" id="mbc-wx-temp">--°</div>
+        <div class="mbc-wx-cond" id="mbc-wx-cond">--</div>
+        <div class="mbc-wx-forecast" id="mbc-wx-forecast"></div>
+      </div>
+    </div>
+
+    <div class="flip-tile bl-clock col-bot">
+      <div class="flip-inner" id="flip-clock">
+        <div class="flip-front">
+          <button class="pin-btn" onclick="pinOpen(this)" title="Rozbalit"></button>
+          <iframe id="clock-iframe" src="widgets/clock-flip-full.html" scrolling="no"></iframe>
+          <div class="mob-card mob-card-clock" id="mbc-clock">
+            <div class="mbc-clk-h" id="mbc-clk-h">--</div>
+            <div class="mbc-clk-sep">:</div>
+            <div class="mbc-clk-m" id="mbc-clk-m">--</div>
+            <div class="mbc-clk-secs"><span class="mbc-clk-sec-val" id="mbc-clk-s">00</span></div>
+          </div>
+        </div>
+        <div class="flip-back">
+          <div class="flip-back-deco" style="width:160%;height:160%;top:-30%;left:-30%;"></div>
+          <div class="flip-back-deco" style="width:110%;height:110%;top:-5%;left:-5%;"></div>
+          <div class="flip-back-deco" style="width:60%;height:60%;top:20%;left:20%;"></div>
+          <div class="flip-back-logo">K — S</div>
+          <div class="flip-back-sub">// hodiny skryty</div>
+        </div>
+      </div>
+      <button class="flip-btn" id="btn-clock" onclick="flipTile('flip-clock','btn-clock')">⟳</button>
+    </div>
+
+    <div class="flip-tile bl-agenda col-bot">
+      <div class="flip-inner" id="flip-agenda">
+        <div class="flip-front">
+          <button class="pin-btn" onclick="pinOpen(this)" title="Rozbalit"></button>
+          <iframe src="widgets/agenda-widget.html" scrolling="no"></iframe>
+          <div class="mob-card" id="mbc-agenda">
+            <div class="mbc-title">Agenda</div>
+            <div class="mbc-count" id="mbc-agenda-count">--</div>
+            <div class="mbc-sub" id="mbc-agenda-sub">dnes</div>
+            <div class="mbc-preview" id="mbc-agenda-preview"></div>
+          </div>
+        </div>
+        <div class="flip-back">
+          <div class="flip-back-deco" style="width:160%;height:160%;top:-30%;left:-30%;"></div>
+          <div class="flip-back-deco" style="width:110%;height:110%;top:-5%;left:-5%;"></div>
+          <div class="flip-back-deco" style="width:60%;height:60%;top:20%;left:20%;"></div>
+          <div class="flip-back-logo">K — S</div>
+          <div class="flip-back-sub">// agenda skryta</div>
+        </div>
+      </div>
+      <button class="flip-btn" id="btn-agenda" onclick="flipTile('flip-agenda','btn-agenda')">⟳</button>
+    </div>
+
+    <div class="flip-tile bl-cal col-top">
+      <div class="flip-inner" id="flip-cal">
+        <div class="flip-front">
+          <iframe src="widgets/calendar-widget.html" scrolling="no"></iframe>
+          <div class="mob-card mob-card-cal" id="mbc-cal">
+            <div class="mbc-cal-bigdate">
+              <div class="mbc-cal-day-num" id="mbc-cal-daynum">--</div>
+              <div class="mbc-cal-dayname" id="mbc-cal-dayname">—</div>
+              <div class="mbc-cal-month-name" id="mbc-cal-monthname">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="flip-back">
+          <div class="flip-back-deco" style="width:160%;height:160%;top:-30%;left:-30%;"></div>
+          <div class="flip-back-deco" style="width:110%;height:110%;top:-5%;left:-5%;"></div>
+          <div class="flip-back-deco" style="width:60%;height:60%;top:20%;left:20%;"></div>
+          <div class="flip-back-logo">K — S</div>
+          <div class="flip-back-sub">// kalendář skryt</div>
+        </div>
+      </div>
+      <button class="flip-btn" id="btn-cal" onclick="flipTile('flip-cal','btn-cal')">⟳</button>
+    </div>
+
+    <div class="flip-tile bl-todo col-bot">
+      <div class="flip-inner" id="flip-todo">
+        <div class="flip-front">
+          <button class="pin-btn" onclick="pinOpen(this)" title="Rozbalit"></button>
+          <iframe src="widgets/todo-widget.html" scrolling="no"></iframe>
+          <div class="mob-card" id="mbc-todo">
+            <div class="mbc-title">To-Do</div>
+            <div class="mbc-count" id="mbc-todo-count">--</div>
+            <div class="mbc-sub">nesplněno</div>
+            <div class="mbc-todo-cats">
+              <button class="mbc-cat-arrow" id="mbc-todo-prev">‹</button>
+              <div class="mbc-cat-name" id="mbc-todo-cat">—</div>
+              <div class="mbc-cat-count" id="mbc-todo-cat-cnt"></div>
+              <button class="mbc-cat-arrow" id="mbc-todo-next">›</button>
+            </div>
+          </div>
+        </div>
+        <div class="flip-back">
+          <div class="flip-back-deco" style="width:160%;height:160%;top:-30%;left:-30%;"></div>
+          <div class="flip-back-deco" style="width:110%;height:110%;top:-5%;left:-5%;"></div>
+          <div class="flip-back-deco" style="width:60%;height:60%;top:20%;left:20%;"></div>
+          <div class="flip-back-logo">K — S</div>
+          <div class="flip-back-sub">// to-do skryto</div>
+        </div>
+      </div>
+      <button class="flip-btn" id="btn-todo" onclick="flipTile('flip-todo','btn-todo')">⟳</button>
+    </div>
+
+    <div class="flip-tile bl-rss col-top">
+      <div class="flip-inner" id="flip-rss">
+        <div class="flip-front">
+          <button class="pin-btn" onclick="pinOpen(this)" title="Rozbalit"></button>
+          <iframe src="widgets/rss-widget.html" scrolling="no"></iframe>
+          <div class="mob-card" id="mbc-rss">
+            <div class="mbc-title">RSS</div>
+            <div class="mbc-count" id="mbc-rss-count">--</div>
+            <div class="mbc-sub">zdrojů</div>
+            <div class="mbc-sources" id="mbc-sources"></div>
+          </div>
+        </div>
+        <div class="flip-back">
+          <div class="flip-back-deco" style="width:160%;height:160%;top:-30%;left:-30%;"></div>
+          <div class="flip-back-deco" style="width:110%;height:110%;top:-5%;left:-5%;"></div>
+          <div class="flip-back-deco" style="width:60%;height:60%;top:20%;left:20%;"></div>
+          <div class="flip-back-logo">K — S</div>
+          <div class="flip-back-sub">// rss skryto</div>
+        </div>
+      </div>
+      <button class="flip-btn" id="btn-rss" onclick="flipTile('flip-rss','btn-rss')">⟳</button>
+    </div>
+
+    <div class="flip-tile bl-youtube col-bot">
+      <div class="flip-inner" id="flip-youtube">
+        <div class="flip-front">
+          <button class="pin-btn" onclick="pinOpen(this)" title="Rozbalit"></button>
+          <iframe src="widgets/youtube-widget.html" scrolling="no"></iframe>
+          <div class="mob-card" id="mbc-youtube">
+            <div class="mbc-title">YouTube</div>
+            <div class="mbc-count" id="mbc-yt-count">--</div>
+            <div class="mbc-sub">kanálů</div>
+            <div class="mbc-yt-channels" id="mbc-yt-list"></div>
+          </div>
+        </div>
+        <div class="flip-back">
+          <div class="flip-back-deco" style="width:160%;height:160%;top:-30%;left:-30%;"></div>
+          <div class="flip-back-deco" style="width:110%;height:110%;top:-5%;left:-5%;"></div>
+          <div class="flip-back-deco" style="width:60%;height:60%;top:20%;left:20%;"></div>
+          <div class="flip-back-logo">K — S</div>
+          <div class="flip-back-sub">// youtube skryto</div>
+        </div>
+      </div>
+      <button class="flip-btn" id="btn-youtube" onclick="flipTile('flip-youtube','btn-youtube')">⟳</button>
+    </div>
+
+    <div class="flip-tile bl-notes col-bot">
+      <div class="flip-inner" id="flip-notes">
+        <div class="flip-front">
+          <button class="pin-btn" onclick="pinOpen(this)" title="Rozbalit"></button>
+          <iframe src="widgets/notes-widget.html" scrolling="no"></iframe>
+          <div class="mob-card" id="mbc-notes">
+            <div class="mbc-title">Poznámky</div>
+            <div class="mbc-count" id="mbc-notes-count">--</div>
+            <div class="mbc-preview" id="mbc-notes-preview"></div>
+            <div class="mbc-sub">poznámek</div>
+          </div>
+        </div>
+        <div class="flip-back">
+          <div class="flip-back-deco" style="width:160%;height:160%;top:-30%;left:-30%;"></div>
+          <div class="flip-back-deco" style="width:110%;height:110%;top:-5%;left:-5%;"></div>
+          <div class="flip-back-deco" style="width:60%;height:60%;top:20%;left:20%;"></div>
+          <div class="flip-back-logo">K — S</div>
+          <div class="flip-back-sub">// poznámky skryty</div>
+        </div>
+      </div>
+      <button class="flip-btn" id="btn-notes" onclick="flipTile('flip-notes','btn-notes')">⟳</button>
+    </div>
+
+    <div class="flip-tile bl-diary col-bot">
+      <div class="flip-inner" id="flip-diary">
+        <div class="flip-front">
+          <button class="pin-btn" onclick="pinOpen(this)" title="Rozbalit"></button>
+          <iframe src="widgets/diary-widget.html" scrolling="no"></iframe>
+          <div class="mob-card" id="mbc-diary">
+            <div class="mbc-title">Deník</div>
+          </div>
+        </div>
+        <div class="flip-back">
+          <div class="flip-back-deco" style="width:160%;height:160%;top:-30%;left:-30%;"></div>
+          <div class="flip-back-deco" style="width:110%;height:110%;top:-5%;left:-5%;"></div>
+          <div class="flip-back-deco" style="width:60%;height:60%;top:20%;left:20%;"></div>
+          <div class="flip-back-logo">K — S</div>
+          <div class="flip-back-sub">// deník skryt</div>
+        </div>
+      </div>
+      <button class="flip-btn" id="btn-diary" onclick="flipTile('flip-diary','btn-diary')">⟳</button>
+    </div>
+
+    <!-- FLIP VLEVO DOLE -->
+    <div class="flip-tile bl-warranty col-top">
+      <div class="flip-inner" id="flip-left">
+        <div class="flip-front">
+          <button class="pin-btn" onclick="pinOpen(this)" title="Rozbalit"></button>
+          <iframe src="widgets/warranty-widget.html" scrolling="no"></iframe>
+          <div class="mob-card" id="mbc-warranty">
+            <div class="mbc-title">Záruky</div>
+            <div class="mbc-count" id="mbc-warranty-count">--</div>
+            <div class="mbc-sub">položek</div>
+            <div class="mbc-preview" id="mbc-warranty-preview"></div>
+          </div>
+        </div>
+        <div class="flip-back">
+          <div class="flip-back-deco" style="width:160%;height:160%;top:-30%;left:-30%;"></div>
+          <div class="flip-back-deco" style="width:110%;height:110%;top:-5%;left:-5%;"></div>
+          <div class="flip-back-deco" style="width:60%;height:60%;top:20%;left:20%;"></div>
+          <div class="flip-back-logo">K — S</div>
+          <div class="flip-back-sub">// připraveno</div>
+        </div>
+      </div>
+      <button class="flip-btn" id="btn-left" onclick="flipTile('flip-left','btn-left')">⟳</button>
+    </div>
+
+    <!-- FLIP VPRAVO DOLE -->
+    <div class="flip-tile bl-shopping col-top">
+      <div class="flip-inner" id="flip-right">
+        <div class="flip-front">
+          <button class="pin-btn" onclick="pinOpen(this)" title="Rozbalit"></button>
+          <iframe src="widgets/shopping-widget.html" scrolling="no"></iframe>
+          <div class="mob-card" id="mbc-shopping">
+            <div class="mbc-title">Nákupy</div>
+            <div class="mbc-count" id="mbc-shopping-count">--</div>
+            <div class="mbc-sub">k nákupu</div>
+          </div>
+        </div>
+        <div class="flip-back">
+          <div class="flip-back-deco" style="width:160%;height:160%;top:-30%;left:-30%;"></div>
+          <div class="flip-back-deco" style="width:110%;height:110%;top:-5%;left:-5%;"></div>
+          <div class="flip-back-deco" style="width:60%;height:60%;top:20%;left:20%;"></div>
+          <div class="flip-back-logo">K — S</div>
+          <div class="flip-back-sub">// připraveno</div>
+        </div>
+      </div>
+      <button class="flip-btn" id="btn-right" onclick="flipTile('flip-right','btn-right')">⟳</button>
+    </div>
+
+    <!-- PIN OVERLAY -->
+
+  </div><!-- /bento -->
+
+  <div class="side-pad"></div>
+</div>
+
+<!-- Nastavení pod gridem — jen mobil -->
+<div id="mob-settings-bar">
+  <button onclick="window.location='settings.html'">⚙</button>
+</div>
+<div id="mob-view">
+  <div class="mob-header">
+    <div class="mob-title">K — S</div>
+    <button class="mob-settings-btn" onclick="window.location='settings.html'">⚙</button>
+  </div>
+
+  <div class="mob-row" data-src="widgets/weather-widget2.html" data-id="weather">
+    <div class="mob-row-icon">☁</div>
+    <div class="mob-row-body">
+      <div class="mob-row-name">Počasí</div>
+      <div class="mob-row-info" id="mob-info-weather">načítám...</div>
+    </div>
+    <div class="mob-row-arrow">›</div>
+  </div>
+
+  <div class="mob-row" data-src-clock="1" data-id="clock">
+    <div class="mob-row-icon">🕐</div>
+    <div class="mob-row-body">
+      <div class="mob-row-name">Hodiny</div>
+      <div class="mob-row-info" id="mob-info-clock">--:--:--</div>
+    </div>
+    <div class="mob-row-arrow">›</div>
+  </div>
+
+  <div class="mob-row" data-src="widgets/agenda-widget.html" data-id="agenda">
+    <div class="mob-row-icon">📋</div>
+    <div class="mob-row-body">
+      <div class="mob-row-name">Agenda</div>
+      <div class="mob-row-info" id="mob-info-agenda">—</div>
+    </div>
+    <div class="mob-row-arrow">›</div>
+  </div>
+
+  <div class="mob-row" data-src="widgets/todo-widget.html" data-id="todo">
+    <div class="mob-row-icon">✓</div>
+    <div class="mob-row-body">
+      <div class="mob-row-name">To-Do</div>
+      <div class="mob-row-info" id="mob-info-todo">—</div>
+    </div>
+    <div class="mob-row-arrow">›</div>
+  </div>
+
+  <div class="mob-row" data-src="widgets/calendar-widget.html" data-id="cal">
+    <div class="mob-row-icon">📅</div>
+    <div class="mob-row-body">
+      <div class="mob-row-name">Kalendář</div>
+      <div class="mob-row-info" id="mob-info-cal">—</div>
+    </div>
+    <div class="mob-row-arrow">›</div>
+  </div>
+
+  <div class="mob-row" data-src="widgets/rss-widget.html" data-id="rss">
+    <div class="mob-row-icon">📰</div>
+    <div class="mob-row-body">
+      <div class="mob-row-name">RSS · Novinky</div>
+      <div class="mob-row-info" id="mob-info-rss">—</div>
+    </div>
+    <div class="mob-row-arrow">›</div>
+  </div>
+
+  <div class="mob-row" data-src="widgets/youtube-widget.html" data-id="youtube">
+    <div class="mob-row-icon">▶</div>
+    <div class="mob-row-body">
+      <div class="mob-row-name">YouTube</div>
+      <div class="mob-row-info" id="mob-info-youtube">—</div>
+    </div>
+    <div class="mob-row-arrow">›</div>
+  </div>
+
+  <div class="mob-row" data-src="widgets/notes-widget.html" data-id="notes">
+    <div class="mob-row-icon">📝</div>
+    <div class="mob-row-body">
+      <div class="mob-row-name">Poznámky</div>
+      <div class="mob-row-info" id="mob-info-notes">—</div>
+    </div>
+    <div class="mob-row-arrow">›</div>
+  </div>
+
+  <div class="mob-row" data-src="widgets/diary-widget.html" data-id="diary">
+    <div class="mob-row-icon">📖</div>
+    <div class="mob-row-body">
+      <div class="mob-row-name">Deník</div>
+      <div class="mob-row-info" id="mob-info-diary">—</div>
+    </div>
+    <div class="mob-row-arrow">›</div>
+  </div>
+
+  <div class="mob-row" data-src="widgets/warranty-widget.html" data-id="warranty">
+    <div class="mob-row-icon">🛡</div>
+    <div class="mob-row-body">
+      <div class="mob-row-name">Záruky</div>
+      <div class="mob-row-info" id="mob-info-warranty">—</div>
+    </div>
+    <div class="mob-row-arrow">›</div>
+  </div>
+
+  <div class="mob-row" data-src="widgets/shopping-widget.html" data-id="shopping">
+    <div class="mob-row-icon">🛒</div>
+    <div class="mob-row-body">
+      <div class="mob-row-name">Nákupy</div>
+      <div class="mob-row-info" id="mob-info-shopping">—</div>
+    </div>
+    <div class="mob-row-arrow">›</div>
+  </div>
+</div>
+
+<!-- Fullscreen overlay -->
+<div id="mob-overlay">
+  <div class="mob-overlay-bar">
+    <button class="mob-back-btn" id="mob-back">‹</button>
+    <div class="mob-overlay-title" id="mob-overlay-title">Widget</div>
+  </div>
+  <div id="mob-clock-styles"></div>
+  <iframe id="mob-iframe" src="" scrolling="yes"></iframe>
+</div>
+
+<script>
+function flipTile(id, btnId) {
+  document.getElementById(id).classList.toggle('flipped');
+}
+
+// ── PIN ──
+let pinActiveTile = null;
+let pinActiveBtn = null;
+let pinHiddenTiles = [];
+
+// Cílová oblast pinu v gridu (1-indexed, inclusive)
+const PIN_AREA = { colStart: 2, colEnd: 3, rowStart: 2, rowEnd: 4 };
+
+function parseGridLine(value, fallbackStart, fallbackSpan) {
+  // value může být "2", "2 / 4", "2 / span 2" — vrátí {start, end} v gridových liniích (end exclusive)
+  if (!value || value === 'auto' || value === 'auto / auto') {
+    return { start: fallbackStart, end: fallbackStart + fallbackSpan };
+  }
+  const parts = value.split('/').map(s => s.trim());
+  const start = parseInt(parts[0], 10);
+  if (parts.length === 1 || isNaN(start)) {
+    return { start: fallbackStart, end: fallbackStart + fallbackSpan };
+  }
+  if (parts[1] && parts[1].startsWith('span')) {
+    const span = parseInt(parts[1].replace('span', ''), 10) || 1;
+    return { start, end: start + span };
+  }
+  const end = parseInt(parts[1], 10);
+  return { start, end: isNaN(end) ? start + 1 : end };
+}
+
+function tileOccupiesArea(tile) {
+  const cs = getComputedStyle(tile);
+  const col = parseGridLine(cs.gridColumn, 1, 1);
+  const row = parseGridLine(cs.gridRow, 1, 1);
+  // Kolize s PIN_AREA (sloupce 2-3 = linie 2 až 4, řádky 2-4 = linie 2 až 5)
+  const colOverlap = col.start < 4 && col.end > 2;
+  const rowOverlap = row.start < 5 && row.end > 2;
+  return colOverlap && rowOverlap;
+}
+
+function pinOpen(btn) {
+  // toggle — pokud už je pinnutý, zavři
+  if (pinActiveTile) { pinClose(); return; }
+  const tile = btn.closest('.tile') || btn.closest('.flip-tile');
+  if (!tile) return;
+
+  pinActiveTile = tile;
+  pinActiveBtn = btn;
+  tile.classList.add('pinned');
+  document.querySelector('.bento').classList.add('pin-active');
+  btn.classList.add('active');
+
+  // Schovej jen bloky, které reálně okupují cílovou oblast pinu (kromě pinnutého samotného)
+  pinHiddenTiles = [];
+  document.querySelectorAll('.bento > .tile, .bento > .flip-tile').forEach(t => {
+    if (t === tile) return;
+    if (tileOccupiesArea(t)) {
+      t.classList.add('hidden-by-pin');
+      pinHiddenTiles.push(t);
+    }
+  });
+}
+
+function pinClose() {
+  if (!pinActiveTile) return;
+  pinActiveTile.classList.remove('pinned');
+  document.querySelector('.bento').classList.remove('pin-active');
+  pinActiveBtn.classList.remove('active');
+  pinHiddenTiles.forEach(t => t.classList.remove('hidden-by-pin'));
+  pinHiddenTiles = [];
+  pinActiveTile = null;
+  pinActiveBtn = null;
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') pinClose();
+});
+
+// Po dokončení příjezdové animace spustí flip obou dolních bloků
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('flip-left').classList.add('flipped');
+    setTimeout(() => {
+      document.getElementById('flip-right').classList.add('flipped');
+    }, 200);
+    setTimeout(() => {
+      document.getElementById('flip-left').classList.remove('flipped');
+      setTimeout(() => {
+        document.getElementById('flip-right').classList.remove('flipped');
+      }, 200);
+    }, 1800);
+  }, 1500);
+});
+
+// ── ROZLOŽENÍ DASHBOARDU ──
+// Editace probíhá na samostatné stránce settings.html, zde se jen aplikuje uložené rozložení.
+const LAYOUT_KEY = 'ks-layout';
+const LAYOUT_MOBILE_KEY = 'ks-layout-mobile';
+const MOB_IS_MOBILE = () => window.innerWidth <= 768;
+
+// Výchozí mobilní rozložení — jiné než desktopové, dokud si ho uživatel sám nepřizpůsobí
+const MOBILE_DEFAULT_LAYOUT = {
+  weather:  { col: 1, row: 1, colSpan: 1, rowSpan: 2 },
+  clock:    { col: 2, row: 1, colSpan: 2, rowSpan: 1 },
+  cal:      { col: 4, row: 1, colSpan: 1, rowSpan: 2 },
+  todo:     { col: 2, row: 2, colSpan: 2, rowSpan: 1 },
+  notes:    { col: 1, row: 3, colSpan: 1, rowSpan: 1 },
+  youtube:  { col: 2, row: 3, colSpan: 1, rowSpan: 1 },
+  rss:      { col: 3, row: 3, colSpan: 1, rowSpan: 1 },
+  agenda:   { col: 4, row: 3, colSpan: 1, rowSpan: 1 },
+  warranty: { col: 1, row: 4, colSpan: 1, rowSpan: 1 },
+  diary:    { col: 2, row: 4, colSpan: 2, rowSpan: 1 },
+  shopping: { col: 4, row: 4, colSpan: 1, rowSpan: 1 },
+};
+
+function loadLayout() {
+  try { return JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null'); }
+  catch { return null; }
+}
+
+function loadMobileLayout() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAYOUT_MOBILE_KEY) || 'null');
+    return saved || MOBILE_DEFAULT_LAYOUT;
+  } catch { return MOBILE_DEFAULT_LAYOUT; }
+}
+
+function applyLayout(layout) {
+  if (!layout) return;
+  Object.entries(layout).forEach(([id, b]) => {
+    const tile = document.querySelector('.bl-' + id);
+    if (!tile) return;
+    tile.style.gridColumn = b.colSpan > 1 ? `${b.col} / span ${b.colSpan}` : `${b.col}`;
+    tile.style.gridRow = b.rowSpan > 1 ? `${b.row} / span ${b.rowSpan}` : `${b.row}`;
+  });
+}
+
+// Na mobilu se použije mobilní rozložení (vlastní, nebo nové výchozí), na PC zůstává beze změny
+let ksCurrentLayoutMode = MOB_IS_MOBILE() ? 'mobile' : 'desktop';
+if (ksCurrentLayoutMode === 'mobile') {
+  applyLayout(loadMobileLayout());
+} else {
+  applyLayout(loadLayout());
+}
+
+// Hlídač změny velikosti okna — pokud se okno zvětší/zmenší přes hranici 768px
+// (např. při zavření/otevření mobilní simulace v prohlížeči), rozložení se přepočítá samo,
+// bez nutnosti stránku ručně obnovovat.
+let ksResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(ksResizeTimer);
+  ksResizeTimer = setTimeout(() => {
+    const newMode = MOB_IS_MOBILE() ? 'mobile' : 'desktop';
+    if (newMode !== ksCurrentLayoutMode) {
+      ksCurrentLayoutMode = newMode;
+      applyLayout(newMode === 'mobile' ? loadMobileLayout() : loadLayout());
+    }
+  }, 200);
+});
+
+// ── MOBIL TAP-TO-EXPAND ──
+const mobOverlay = document.getElementById('mob-overlay');
+const mobIframe  = document.getElementById('mob-iframe');
+const mobTitle   = document.getElementById('mob-overlay-title');
+const mobClockStyles = document.getElementById('mob-clock-styles');
+
+// Mapování třídy dlaždice na src widgetu a název
+const MOB_TILE_MAP = {
+  'bl-weather':  { src: 'widgets/weather-widget2.html', name: 'Počasí' },
+  'bl-clock':    { src: null, name: 'Hodiny', isClock: true },
+  'bl-agenda':   { src: 'widgets/agenda-widget.html',   name: 'Agenda' },
+  'bl-cal':      { src: 'widgets/calendar-widget.html', name: 'Kalendář' },
+  'bl-todo':     { src: 'widgets/todo-widget.html',     name: 'To-Do' },
+  'bl-rss':      { src: 'widgets/rss-widget.html',      name: 'RSS' },
+  'bl-youtube':  { src: 'widgets/youtube-widget.html',  name: 'YouTube' },
+  'bl-notes':    { src: 'widgets/notes-widget.html',    name: 'Poznámky' },
+  'bl-diary':    { src: 'widgets/diary-widget.html',    name: 'Deník' },
+  'bl-warranty': { src: 'widgets/warranty-widget.html', name: 'Záruky' },
+  'bl-shopping': { src: 'widgets/shopping-widget.html', name: 'Nákupy' },
+};
+
+function mobOpenWidget(tileEl) {
+  if (!MOB_IS_MOBILE()) return;
+  // Najdi třídu dlaždice
+  const key = Object.keys(MOB_TILE_MAP).find(k => tileEl.classList.contains(k));
+  if (!key) return;
+  const info = MOB_TILE_MAP[key];
+
+  mobTitle.textContent = info.name;
+  mobClockStyles.innerHTML = '';
+  mobClockStyles.classList.remove('visible');
+
+  if (info.isClock) {
+    // Hodiny — načti správný soubor a zobraz volič stylu
+    const theme = ksGetTheme();
+    const opts = CLOCK_OPTIONS[theme] || CLOCK_OPTIONS.gold;
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('ks-clock-style') || '{}'); } catch {}
+    const activeId = saved[theme] || opts[0].id;
+    const chosen = opts.find(o => o.id === activeId) || opts[0];
+    mobIframe.src = chosen.file;
+
+    if (opts.length > 1) {
+      mobClockStyles.classList.add('visible');
+      opts.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = 'mob-clock-opt' + (opt.id === activeId ? ' active' : '');
+        btn.textContent = opt.label || opt.id;
+        btn.dataset.optId = opt.id;
+        btn.dataset.optFile = opt.file;
+        btn.addEventListener('click', () => {
+          // Uložit a přepnout
+          const all = {};
+          try { Object.assign(all, JSON.parse(localStorage.getItem('ks-clock-style') || '{}')); } catch {}
+          all[theme] = opt.id;
+          localStorage.setItem('ks-clock-style', JSON.stringify(all));
+          mobIframe.src = opt.file;
+          mobClockStyles.querySelectorAll('.mob-clock-opt').forEach(b => b.classList.toggle('active', b.dataset.optId === opt.id));
+          // Aktualizuj i desktop iframe
+          applyClockStyle();
+        });
+        mobClockStyles.appendChild(btn);
+      });
+    }
+  } else {
+    mobIframe.src = info.src;
+  }
+
+  mobOverlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function mobClose() {
+  mobOverlay.classList.remove('open');
+  setTimeout(() => { mobIframe.src = ''; }, 300);
+  document.body.style.overflow = '';
+}
+
+document.getElementById('mob-back').addEventListener('click', mobClose);
+
+// Tap na dlaždice
+document.querySelectorAll('.bento > .tile, .bento > .flip-tile').forEach(tile => {
+  tile.addEventListener('click', e => {
+    if (!MOB_IS_MOBILE()) return;
+    // Ignoruj klik na flip/pin tlačítka
+    if (e.target.closest('.flip-btn, .pin-btn')) return;
+    mobOpenWidget(tile);
+  });
+});
+
+function mobOpen(src, title) {
+  mobIframe.src = src;
+  mobTitle.textContent = title;
+  mobOverlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function mobClose() {
+  mobOverlay.classList.remove('open');
+  mobIframe.src = '';
+  document.body.style.overflow = '';
+}
+document.getElementById('mob-back').addEventListener('click', mobClose);
+
+// Kliknutí na řádek widgetu
+document.querySelectorAll('.mob-row').forEach(row => {
+  row.addEventListener('click', () => {
+    const name = row.querySelector('.mob-row-name').textContent;
+    if (row.dataset.srcClock) {
+      // Hodiny — vyber správný soubor podle motivu
+      const theme = ksGetTheme();
+      const opts = CLOCK_OPTIONS[theme] || CLOCK_OPTIONS.gold;
+      let saved = {};
+      try { saved = JSON.parse(localStorage.getItem('ks-clock-style') || '{}'); } catch {}
+      const styleId = saved[theme] || opts[0].id;
+      const chosen = opts.find(o => o.id === styleId) || opts[0];
+      mobOpen(chosen.file, name);
+    } else {
+      mobOpen(row.dataset.src, name);
+    }
+  });
+});
+
+// ── ŽIVÉ INFORMACE V ŘÁDCÍCH ──
+function setText(id, text) {
+  const el = document.getElementById('mob-info-' + id);
+  if (el && text) el.textContent = text;
+}
+
+function updateMobInfo() {
+  // Hodiny — přímo z Date()
+  const now = new Date();
+  setText('clock',
+    String(now.getHours()).padStart(2,'0') + ':' +
+    String(now.getMinutes()).padStart(2,'0') + ':' +
+    String(now.getSeconds()).padStart(2,'0'));
+
+  // Počasí — přímý fetch z open-meteo, nezávislý na weather widgetu
+  try {
+    const locRaw = localStorage.getItem('ks-weather-loc');
+    const loc = locRaw ? JSON.parse(locRaw) : { lat: 50.0755, lon: 14.4378 };
+    const wxCached = JSON.parse(localStorage.getItem('ks-mob-weather') || 'null');
+    const codeToImg = (code) => {
+      const stateMap = [[95,99,'storm'],[71,77,'snow'],[51,55,'rain'],[61,67,'rain'],[80,82,'rain'],[45,48,'fog'],[35,40,'hot'],[0,2,'sunny'],[3,3,'sunny'],[1,10,'sunny']];
+      let img = 'sunny';
+      for (const [lo,hi,s] of stateMap) { if (code >= lo && code <= hi) { img = s; break; } }
+      if (!['sunny','rainy','snow','storm','fog','hot'].includes(img)) img = 'sunny';
+      return img;
+    };
+    const renderForecast = (daily) => {
+      const fEl = document.getElementById('mbc-wx-forecast');
+      if (!fEl || !Array.isArray(daily)) return;
+      fEl.innerHTML = daily.slice(0,3).map(dday => `
+        <div class="mbc-wx-fday">
+          <img src="widgets/vultures8/${dday.img}.png" alt="">
+          <div class="mbc-wx-fmax">${Math.round(dday.max)}°</div>
+          <div class="mbc-wx-fmin">${Math.round(dday.min)}°</div>
+        </div>
+      `).join('');
+    };
+    if (wxCached) {
+      const t = document.getElementById('mbc-wx-temp');
+      const co = document.getElementById('mbc-wx-cond');
+      const im = document.getElementById('mbc-wx-img');
+      if (t) t.textContent = Math.round(wxCached.temp) + '°';
+      if (co) co.textContent = wxCached.cond || '';
+      if (im) im.src = 'widgets/vultures8/' + (wxCached.img || 'sunny') + '.png';
+      if (wxCached.daily) renderForecast(wxCached.daily);
+    }
+    // Fetch každých 10 minut
+    const lastFetch = parseInt(localStorage.getItem('ks-mob-wx-ts') || '0');
+    if (Date.now() - lastFetch > 600000) {
+      localStorage.setItem('ks-mob-wx-ts', Date.now());
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`)
+        .then(r => r.json()).then(d => {
+          const code = d.current?.weather_code || 0;
+          const temp = d.current?.temperature_2m || 0;
+          const wmoText = {0:'Jasno',1:'Převážně jasno',2:'Polojasno',3:'Zataženo',45:'Mlha',51:'Mrholení',61:'Déšť',63:'Déšť',71:'Sněžení',80:'Přeháňky',95:'Bouřka',96:'Bouřka'};
+          const img = codeToImg(code);
+          // Denní předpověď — přeskočíme dnešek (index 0), vezmeme následující 3 dny
+          const daily = [];
+          if (d.daily && Array.isArray(d.daily.time)) {
+            for (let i = 1; i < d.daily.time.length && daily.length < 3; i++) {
+              daily.push({
+                max: d.daily.temperature_2m_max[i],
+                min: d.daily.temperature_2m_min[i],
+                img: codeToImg(d.daily.weather_code[i] || 0),
+              });
+            }
+          }
+          const wx = { temp, cond: wmoText[code] || 'Proměnlivě', img, daily };
+          localStorage.setItem('ks-mob-weather', JSON.stringify(wx));
+          const t = document.getElementById('mbc-wx-temp');
+          const co = document.getElementById('mbc-wx-cond');
+          const im = document.getElementById('mbc-wx-img');
+          if (t) t.textContent = Math.round(temp) + '°';
+          if (co) co.textContent = wx.cond;
+          if (im) im.src = 'widgets/vultures8/' + img + '.png';
+          renderForecast(daily);
+        }).catch(() => {});
+    }
+  } catch {}
+
+  // To-Do — počet aktivních úkolů
+  try {
+    const todos = JSON.parse(localStorage.getItem('ks-todos') || '[]');
+    const active = todos.filter(t => !t.done).length;
+    setText('todo', active > 0 ? `${active} úkol${active === 1 ? '' : active < 5 ? 'y' : 'ů'}` : 'vše splněno');
+  } catch {}
+
+  // RSS — počet článků (čteme z feeds)
+  try {
+    const feeds = JSON.parse(localStorage.getItem('ks-rss-feeds') || '[]');
+    setText('rss', feeds.length > 0 ? `${feeds.length} zdroj${feeds.length === 1 ? '' : feeds.length < 5 ? 'e' : 'ů'}` : 'žádné zdroje');
+  } catch {}
+
+  // Poznámky — počet
+  try {
+    const cats = JSON.parse(localStorage.getItem('ks-notes-cats') || '{}');
+    const count = Object.values(cats).reduce((s, arr) => s + arr.length, 0);
+    setText('notes', count > 0 ? `${count} poznámek` : 'prázdné');
+  } catch {}
+
+  // Záruky
+  try {
+    const wars = JSON.parse(localStorage.getItem('ks-warranties') || '[]');
+    const active = wars.filter(w => !w.archived).length;
+    setText('warranty', active > 0 ? `${active} položek` : 'prázdné');
+  } catch {}
+
+  // Nákupy
+  try {
+    const items = JSON.parse(localStorage.getItem('ks-shopping') || '[]');
+    const todo = items.filter(i => !i.done).length;
+    setText('shopping', todo > 0 ? `${todo} položek` : 'vše nakoupeno');
+  } catch {}
+
+  // Agenda/Kalendář — počet událostí dnes
+  try {
+    const fmtDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const today = fmtDate(new Date());
+    const manual = JSON.parse(localStorage.getItem('ks-calendar') || '{}');
+    const google = JSON.parse(localStorage.getItem('ks-google-events') || '{}');
+    const count = ((manual[today] || []).length) + ((google[today] || []).length);
+    setText('agenda', count > 0 ? `dnes ${count} ${count === 1 ? 'událost' : count < 5 ? 'události' : 'událostí'}` : 'dnes nic');
+    setText('cal', count > 0 ? `dnes ${count} ${count === 1 ? 'událost' : count < 5 ? 'události' : 'událostí'}` : 'dnes nic');
+  } catch {}
+
+  // YouTube — počet kanálů
+  try {
+    const chs = JSON.parse(localStorage.getItem('ks-yt-channels') || '[]');
+    setText('youtube', chs.length > 0 ? `${chs.length} kanál${chs.length === 1 ? '' : chs.length < 5 ? 'y' : 'ů'}` : 'žádné kanály');
+  } catch {}
+
+  // Deník — datum posledního záznamu
+  try {
+    const entries = JSON.parse(localStorage.getItem('ks-diary') || '[]');
+    if (entries.length > 0) {
+      const last = entries[entries.length - 1];
+      setText('diary', `poslední: ${last.date || '—'}`);
+    } else {
+      setText('diary', 'žádné záznamy');
+    }
+  } catch {}
+}
+
+updateMobInfo();
+setInterval(updateMobInfo, 2000);
+
+// ── STYL HODIN PODLE MOTIVU ──
+const CLOCK_OPTIONS = {
+  gold:    [{ id: 'flip',      file: 'widgets/clock-flip-full.html' }],
+  matrix:  [{ id: 'flip',      file: 'widgets/clock-flip-full.html' },
+            { id: 'matrix',    file: 'widgets/matrix-clock-widget.html' }],
+  neon:    [{ id: 'flip',      file: 'widgets/clock-flip-full.html' },
+            { id: 'multi',     file: 'widgets/neon-clock-widget.html' }],
+  crimson: [{ id: 'flip',      file: 'widgets/clock-flip-full.html' },
+            { id: 'hourglass', file: 'widgets/crimson-clock-widget.html' }],
+  solar:   [{ id: 'flip',      file: 'widgets/clock-flip-full.html' },
+            { id: 'sundial',   file: 'widgets/solar-clock-widget.html' }],
+  azure:   [{ id: 'flip',      file: 'widgets/clock-flip-full.html' },
+            { id: 'pocket',    file: 'widgets/azure-clock-widget.html' }],
+};
+
+function applyClockStyle() {
+  const iframe = document.getElementById('clock-iframe');
+  if (!iframe) return;
+  const theme = ksGetTheme();
+  const options = CLOCK_OPTIONS[theme] || CLOCK_OPTIONS.gold;
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('ks-clock-style') || '{}'); } catch {}
+  const styleId = saved[theme] || options[0].id;
+  const chosen = options.find(o => o.id === styleId) || options[0];
+  if (!iframe.src.endsWith(chosen.file)) iframe.src = chosen.file;
+}
+applyClockStyle();
+
+// Reaguj na změnu motivu/stylu hodin provedenou v Nastavení (jiná záložka)
+window.addEventListener('storage', e => {
+  if (e.key === 'ks-theme' || e.key === 'ks-clock-style') applyClockStyle();
+});
+
+// ── MOB-CARDS — živá data ──
+// (MOB_IS_MOBILE je definováno výše, u rozložení dashboardu)
+
+// To-Do kategorie stav
+let mbcTodoCats = [], mbcTodoCatIdx = 0;
+
+function mobCardUpdate() {
+  if (!MOB_IS_MOBILE()) return;
+
+  const now = new Date();
+
+  // Hodiny + sekundy s flip efektem
+  const hEl = document.getElementById('mbc-clk-h');
+  const mEl = document.getElementById('mbc-clk-m');
+  const sEl = document.getElementById('mbc-clk-s');
+  if (hEl) hEl.textContent = String(now.getHours()).padStart(2,'0');
+  if (mEl) mEl.textContent = String(now.getMinutes()).padStart(2,'0');
+  if (sEl) {
+    const newS = String(now.getSeconds()).padStart(2,'0');
+    if (sEl.textContent !== newS) {
+      sEl.classList.add('flip');
+      setTimeout(() => { sEl.textContent = newS; sEl.classList.remove('flip'); }, 150);
+    }
+  }
+
+  // Počasí
+  try {
+    const wx = JSON.parse(localStorage.getItem('ks-mob-weather') || 'null');
+    if (wx) {
+      const tempEl = document.getElementById('mbc-wx-temp');
+      const condEl = document.getElementById('mbc-wx-cond');
+      const imgEl  = document.getElementById('mbc-wx-img');
+      const fEl    = document.getElementById('mbc-wx-forecast');
+      if (tempEl) tempEl.textContent = Math.round(wx.temp) + '°';
+      if (condEl) condEl.textContent = wx.cond || '';
+      if (imgEl && wx.img) imgEl.src = 'widgets/vultures8/' + wx.img + '.png';
+      if (fEl && Array.isArray(wx.daily)) {
+        fEl.innerHTML = wx.daily.slice(0,3).map(dday => `
+          <div class="mbc-wx-fday">
+            <img src="widgets/vultures8/${dday.img}.png" alt="">
+            <div class="mbc-wx-fmax">${Math.round(dday.max)}°</div>
+            <div class="mbc-wx-fmin">${Math.round(dday.min)}°</div>
+          </div>
+        `).join('');
+      }
+    }
+  } catch {}
+
+  // Agenda + Kalendář — dnes
+  try {
+    const fmtDate = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    const today = fmtDate(now);
+    const manual = JSON.parse(localStorage.getItem('ks-calendar') || '{}');
+    const google = JSON.parse(localStorage.getItem('ks-google-events') || '{}');
+    const todayEvs = [...(manual[today]||[]), ...(google[today]||[])];
+    const cnt = todayEvs.length;
+    const cntEl = document.getElementById('mbc-agenda-count');
+    const subEl = document.getElementById('mbc-agenda-sub');
+    const previewEl = document.getElementById('mbc-agenda-preview');
+    if (cntEl) cntEl.textContent = cnt;
+    if (subEl) subEl.textContent = cnt === 1 ? 'událost dnes' : cnt < 5 ? 'události dnes' : 'událostí dnes';
+    if (previewEl) previewEl.textContent = todayEvs.length ? (todayEvs[0].title || '') : '';
+
+    // Kalendář — velké datum
+    const monthNamesCZ = ['LEDEN','ÚNOR','BŘEZEN','DUBEN','KVĚTEN','ČERVEN','ČERVENEC','SRPEN','ZÁŘÍ','ŘÍJEN','LISTOPAD','PROSINEC'];
+    const dayNamesCZ = ['NEDĚLE','PONDĚLÍ','ÚTERÝ','STŘEDA','ČTVRTEK','PÁTEK','SOBOTA'];
+    const dayNumEl = document.getElementById('mbc-cal-daynum');
+    const dayNameEl = document.getElementById('mbc-cal-dayname');
+    const monthNameEl = document.getElementById('mbc-cal-monthname');
+    if (dayNumEl) dayNumEl.textContent = now.getDate();
+    if (dayNameEl) dayNameEl.textContent = dayNamesCZ[now.getDay()];
+    if (monthNameEl) monthNameEl.textContent = monthNamesCZ[now.getMonth()];
+  } catch {}
+
+  // To-Do
+  try {
+    const td = JSON.parse(localStorage.getItem('ks-todo-v2') || 'null') || { categories: [], todos: [] };
+    const active = td.todos.filter(t => !t.done).length;
+    const el = document.getElementById('mbc-todo-count');
+    if (el) el.textContent = active;
+    // Kategorie
+    const cats = [{ id: 'all', name: 'Vše' }, ...td.categories];
+    if (JSON.stringify(cats) !== JSON.stringify(mbcTodoCats)) {
+      mbcTodoCats = cats; mbcTodoCatIdx = 0;
+    }
+    mbcUpdateTodoCat(td);
+  } catch {}
+
+  // RSS — zdroje
+  try {
+    const feeds = JSON.parse(localStorage.getItem('ks-rss-feeds') || '[]');
+    const el = document.getElementById('mbc-rss-count');
+    if (el) el.textContent = feeds.length;
+    const src = document.getElementById('mbc-sources');
+    if (src) {
+      src.innerHTML = feeds.slice(0,4).map(f =>
+        `<div class="mbc-source-row">
+          <div class="mbc-source-dot" style="background:${f.color||'var(--gold)'}"></div>
+          <div class="mbc-source-name">${f.name||f.url||'—'}</div>
+        </div>`
+      ).join('') + (feeds.length > 4 ? `<div class="mbc-source-row" style="color:rgba(200,160,60,0.35)">+ ${feeds.length-4} dalších</div>` : '');
+    }
+  } catch {}
+
+  // YouTube
+  try {
+    const chs = JSON.parse(localStorage.getItem('ks-yt-channels') || '[]');
+    const el = document.getElementById('mbc-yt-count');
+    if (el) el.textContent = chs.length;
+    const list = document.getElementById('mbc-yt-list');
+    if (list) {
+      list.innerHTML = chs.slice(0,4).map(ch =>
+        `<div class="mbc-yt-row">
+          <div class="mbc-yt-av">${(ch.initials||ch.name||'?').slice(0,2).toUpperCase()}</div>
+          <div class="mbc-yt-name">${ch.name||'—'}</div>
+        </div>`
+      ).join('') + (chs.length > 4 ? `<div class="mbc-yt-row" style="color:rgba(200,160,60,0.35)">+ ${chs.length-4} dalších</div>` : '');
+    }
+  } catch {}
+
+  // Poznámky
+  try {
+    const notesData = JSON.parse(localStorage.getItem('ks-notes') || '{"categories":[],"notes":[]}');
+    const notesArr = Array.isArray(notesData.notes) ? notesData.notes : [];
+    const el = document.getElementById('mbc-notes-count');
+    if (el) el.textContent = notesArr.length;
+    const sorted = [...notesArr].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return (b.created || '').localeCompare(a.created || '');
+    });
+    const previewEl = document.getElementById('mbc-notes-preview');
+    if (previewEl) {
+      const top = sorted[0];
+      previewEl.textContent = top ? (top.cat === 'odkazy' ? (top.name || '') : (top.text || '')) : '';
+    }
+  } catch {}
+
+  // Záruky
+  try {
+    const wars = JSON.parse(localStorage.getItem('ks-warranties') || '[]');
+    const el = document.getElementById('mbc-warranty-count');
+    if (el) el.textContent = wars.length;
+    const withExpiry = wars.map(w => {
+      const bought = new Date(w.purchaseDate);
+      const expires = new Date(bought);
+      expires.setMonth(expires.getMonth() + parseInt(w.months || 0, 10));
+      return { name: w.name, expires };
+    }).sort((a, b) => a.expires - b.expires);
+    const previewEl = document.getElementById('mbc-warranty-preview');
+    if (previewEl) previewEl.textContent = withExpiry.length ? (withExpiry[0].name || '') : '';
+  } catch {}
+
+  // Nákupy
+  try {
+    const shoppingData = JSON.parse(localStorage.getItem('ks-shopping') || '{"categories":[],"items":[]}');
+    const itemsArr = Array.isArray(shoppingData.items) ? shoppingData.items : (Array.isArray(shoppingData) ? shoppingData : []);
+    const todo = itemsArr.filter(i => !i.done).length;
+    const el = document.getElementById('mbc-shopping-count');
+    if (el) el.textContent = todo;
+  } catch {}
+}
+
+// To-Do kategorie navigace
+function mbcUpdateTodoCat(td) {
+  if (!mbcTodoCats.length) return;
+  if (mbcTodoCatIdx >= mbcTodoCats.length) mbcTodoCatIdx = 0;
+  const cat = mbcTodoCats[mbcTodoCatIdx];
+  const nameEl = document.getElementById('mbc-todo-cat');
+  const cntEl  = document.getElementById('mbc-todo-cat-cnt');
+  if (nameEl) nameEl.textContent = cat.name;
+  if (cntEl && td) {
+    const cnt = cat.id === 'all'
+      ? td.todos.filter(t => !t.done).length
+      : td.todos.filter(t => !t.done && t.category === cat.id).length;
+    cntEl.textContent = cnt > 0 ? cnt : '';
+  }
+}
+document.addEventListener('click', e => {
+  if (!MOB_IS_MOBILE()) return;
+  if (e.target.id === 'mbc-todo-prev') {
+    mbcTodoCatIdx = (mbcTodoCatIdx - 1 + mbcTodoCats.length) % mbcTodoCats.length;
+    try {
+      const td = JSON.parse(localStorage.getItem('ks-todo-v2') || 'null') || { categories:[], todos:[] };
+      mbcUpdateTodoCat(td);
+    } catch {}
+  }
+  if (e.target.id === 'mbc-todo-next') {
+    mbcTodoCatIdx = (mbcTodoCatIdx + 1) % mbcTodoCats.length;
+    try {
+      const td = JSON.parse(localStorage.getItem('ks-todo-v2') || 'null') || { categories:[], todos:[] };
+      mbcUpdateTodoCat(td);
+    } catch {}
+  }
+});
+
+// Kalendář mini-grid
+function renderMobCal() {
+  if (!MOB_IS_MOBILE()) return;
+  const grid = document.getElementById('mbc-cal-grid');
+  if (!grid) return;
+
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  const today = now.getDate();
+  const DAYS = ['Po','Út','St','Čt','Pá','So','Ne'];
+
+  // Načti eventy
+  let evDates = {};
+  try {
+    const manual = JSON.parse(localStorage.getItem('ks-calendar') || '{}');
+    const google = JSON.parse(localStorage.getItem('ks-google-events') || '{}');
+    const all = {...manual};
+    for (const [k,v] of Object.entries(google)) {
+      all[k] = [...(all[k]||[]), ...v];
+    }
+    evDates = all;
+  } catch {}
+
+  const fmtDate = d => `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+  let html = DAYS.map(d => `<div class="mbc-cal-dow">${d}</div>`).join('');
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const firstMon = (firstDay + 6) % 7; // pondělí = 0
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const daysInPrev  = new Date(year, month, 0).getDate();
+
+  // Předchozí měsíc
+  for (let i = firstMon - 1; i >= 0; i--) {
+    html += `<div class="mbc-cal-day other-month">${daysInPrev - i}</div>`;
+  }
+  // Tento měsíc
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = fmtDate(d);
+    const hasEv = evDates[key] && evDates[key].length > 0;
+    const isToday = d === today;
+    html += `<div class="mbc-cal-day${isToday?' today':''}" data-key="${key}" data-d="${d}">
+      ${d}${hasEv ? '<div class="mbc-cal-dot"></div>' : ''}
+    </div>`;
+  }
+  // Následující měsíc
+  const total = firstMon + daysInMonth;
+  const nextDays = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d = 1; d <= nextDays; d++) {
+    html += `<div class="mbc-cal-day other-month">${d}</div>`;
+  }
+
+  grid.innerHTML = html;
+
+  // Kliknutí na den → zobrazí události
+  grid.querySelectorAll('.mbc-cal-day:not(.other-month)').forEach(el => {
+    el.addEventListener('click', () => {
+      grid.querySelectorAll('.mbc-cal-day').forEach(x => x.classList.remove('selected'));
+      el.classList.add('selected');
+      const key = el.dataset.key;
+      const manual = JSON.parse(localStorage.getItem('ks-calendar') || '{}');
+      const google = JSON.parse(localStorage.getItem('ks-google-events') || '{}');
+      const evs = [...(manual[key]||[]), ...(google[key]||[])];
+      const evBox = document.getElementById('mbc-cal-events');
+      if (!evBox) return;
+      if (!evs.length) {
+        evBox.innerHTML = '<div class="mbc-cal-empty">// žádné události</div>';
+      } else {
+        evBox.innerHTML = evs.map(ev =>
+          `<div class="mbc-cal-ev-row" style="border-color:${ev.color||'var(--gold)'}">
+            ${ev.time ? ev.time + ' ' : ''}${ev.title || ''}
+          </div>`
+        ).join('');
+      }
+    });
+  });
+}
+
+mobCardUpdate();
+renderMobCal();
+// Reset weather cache při každém načtení, ať se supák ukáže vždy správně
+try { localStorage.removeItem('ks-mob-wx-ts'); localStorage.removeItem('ks-mob-weather'); } catch {}
+setInterval(mobCardUpdate, 1000);
+
+</script>
+<div id="ks-usage-counter" style="position:fixed; bottom:8px; right:8px; font-family:monospace; font-size:11px; color:#888; background:rgba(0,0,0,0.5); padding:3px 8px; border-radius:4px; z-index:9999;">v1.0</div>
+<script>
+  var ksIsDev = new URLSearchParams(window.location.search).get('dev') === '1';
+  if (ksIsDev) { localStorage.setItem('ks-dev-mode', '1'); }
+  var ksDevMode = ksIsDev || localStorage.getItem('ks-dev-mode') === '1';
+  fetch('https://kulhavysup.cz/dashboard/usage-ping.php' + (ksDevMode ? '?peek=1' : ''), { method: 'GET' })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      var el = document.getElementById('ks-usage-counter');
+      if (el && data.count) { el.textContent = 'použito: ' + data.count + 'x · v1.0'; }
+    })
+    .catch(function() {});
+</script>
+</body>
+</html>

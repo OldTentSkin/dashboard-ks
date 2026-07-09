@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Clock Widget</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-glow: rgba(200,160,60,0.15);
+    --gold-text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: 100%; }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0;
+    margin: 0;
+  }
+
+  .clock-card {
+    width: 100%;
+    height: 100%;
+    border-radius: 18px;
+    padding: 16px 20px;
+    position: relative;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .clock-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  /* HUD rohy */
+  .hud-corner {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-color: rgba(200,160,60,0.25);
+    border-style: solid;
+  }
+  .hud-tl { top: 10px; left: 10px; border-width: 1px 0 0 1px; border-radius: 3px 0 0 0; }
+  .hud-tr { top: 10px; right: 10px; border-width: 1px 1px 0 0; border-radius: 0 3px 0 0; }
+  .hud-bl { bottom: 10px; left: 10px; border-width: 0 0 1px 1px; border-radius: 0 0 0 3px; }
+  .hud-br { bottom: 10px; right: 10px; border-width: 0 1px 1px 0; border-radius: 0 0 3px 0; }
+
+  /* Přepínač režimů */
+  .mode-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+    position: relative; z-index: 2;
+  }
+  .mode-tab {
+    flex: 1;
+    background: transparent;
+    border: 1px solid rgba(200,160,60,0.15);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 2px;
+    padding: 5px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .mode-tab:hover { border-color: var(--gold-dim); color: var(--gold-text); }
+  .mode-tab.active {
+    background: rgba(200,160,60,0.12);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  body.ks-pinned .mode-tab { padding: 20px 6px; font-size: 11px; }
+
+  /* Obsah */
+  .mode-panel { display: none; flex: 1; flex-direction: column; align-items: center; justify-content: center; }
+  .mode-panel.active { display: flex; }
+
+  /* ── HODINY ── */
+  .ring-wrap {
+    position: relative;
+    width: 200px; height: 200px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  canvas { position: absolute; inset: 0; }
+  .clock-center { position: relative; z-index: 2; text-align: center; }
+  .clock-time {
+    font-family: var(--sans);
+    font-size: 46px; font-weight: 700;
+    background: linear-gradient(180deg, #ffffff 0%, #aef4ff 45%, #2fe0ff 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.8)) drop-shadow(0 0 16px rgba(47,224,255,0.6));
+    letter-spacing: 2px; line-height: 1;
+    transform: perspective(200px) rotateX(8deg);
+    transform-origin: center bottom;
+  }
+  .clock-secs { font-size: 11px; color: rgba(255,47,208,0.7); letter-spacing: 3px; margin-top: 2px; }
+  .clock-sub { font-size: 10px; color: var(--text-dim); margin-top: 5px; letter-spacing: 1px; }
+  .clock-footer-row {
+    display: flex; justify-content: space-between; align-items: center;
+    width: 100%; margin-top: 6px;
+    position: relative; z-index: 2;
+  }
+  .clock-date { font-size: 11px; color: var(--gold); letter-spacing: 2px; font-family: var(--sans); font-weight: 600; }
+  .clock-day  { font-size: 10px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; }
+
+  /* ── STOPKY ── */
+  .sw-display {
+    font-family: var(--sans);
+    font-size: 52px; font-weight: 700;
+    background: linear-gradient(180deg, #ffe080 0%, #c8a03c 40%, #7a5a10 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.8));
+    letter-spacing: 2px; line-height: 1;
+    transform: perspective(200px) rotateX(8deg);
+    transform-origin: center bottom;
+    margin-bottom: 6px;
+  }
+  .sw-ms { font-size: 14px; color: rgba(200,160,60,0.5); letter-spacing: 2px; margin-bottom: 16px; }
+  .sw-laps {
+    width: 100%; max-height: 60px; overflow-y: auto;
+    margin-bottom: 12px;
+    scrollbar-width: thin; scrollbar-color: rgba(200,160,60,0.2) transparent;
+  }
+  .sw-lap {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--text-dim);
+    padding: 2px 8px; border-bottom: 1px solid rgba(200,160,60,0.06);
+  }
+  .sw-lap:last-child { color: var(--gold-text); }
+
+  /* ── ODPOČET ── */
+  .cd-display {
+    font-family: var(--sans);
+    font-size: 52px; font-weight: 700;
+    letter-spacing: 2px; line-height: 1;
+    transform: perspective(200px) rotateX(8deg);
+    transform-origin: center bottom;
+    margin-bottom: 6px;
+    transition: color 0.3s;
+  }
+  .cd-display.running {
+    background: linear-gradient(180deg, #ffe080 0%, #c8a03c 40%, #7a5a10 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.8));
+  }
+  .cd-display.done {
+    background: linear-gradient(180deg, #ff8080 0%, #c04040 40%, #7a1010 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.8));
+    animation: cdPulse 0.5s ease-in-out infinite alternate;
+  }
+  @keyframes cdPulse { from { opacity: 1; } to { opacity: 0.5; } }
+
+  .cd-label { font-size: 10px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 14px; }
+
+  /* Nastavení odpočtu */
+  .cd-set {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 14px;
+  }
+  .cd-set-group { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .cd-set-label { font-size: 8px; color: var(--text-dim); letter-spacing: 1px; }
+  .cd-set-input {
+    width: 46px;
+    background: rgba(200,160,60,0.06);
+    border: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text);
+    font-family: var(--sans);
+    font-size: 22px; font-weight: 700;
+    text-align: center;
+    padding: 4px 0;
+    border-radius: 6px;
+    outline: none;
+  }
+  .cd-set-input:focus { border-color: var(--gold); }
+  .cd-sep { font-family: var(--sans); font-size: 22px; font-weight: 700; color: var(--gold-dim); margin-top: 12px; }
+
+  /* Tlačítka */
+  .btn-row { display: flex; gap: 8px; }
+  .btn {
+    flex: 1;
+    background: rgba(200,160,60,0.08);
+    border: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text);
+    font-family: var(--mono);
+    font-size: 9px; letter-spacing: 2px;
+    padding: 7px 4px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  .btn:hover { background: rgba(200,160,60,0.16); border-color: var(--gold); color: var(--gold); }
+  .btn.primary { background: rgba(200,160,60,0.18); border-color: var(--gold); color: var(--gold); }
+  .btn.danger  { border-color: rgba(192,64,64,0.3); color: rgba(192,64,64,0.7); }
+  .btn.danger:hover { background: rgba(192,64,64,0.1); border-color: #c04040; color: #c04040; }
+</style>
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+</head>
+<body>
+
+<div class="clock-card">
+  <div class="hud-corner hud-tl"></div>
+  <div class="hud-corner hud-tr"></div>
+  <div class="hud-corner hud-bl"></div>
+  <div class="hud-corner hud-br"></div>
+
+  <!-- Přepínač -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="clock" data-i18n="clock.tabTime">⏰ Čas</button>
+    <button class="mode-tab" data-mode="stopwatch" data-i18n="clock.tabStopwatch">⏱ Stopky</button>
+    <button class="mode-tab" data-mode="countdown" data-i18n="clock.tabCountdown">⏳ Odpočet</button>
+  </div>
+
+  <!-- ── HODINY ── -->
+  <div class="mode-panel active" id="panel-clock">
+    <div class="ring-wrap">
+      <canvas id="ring-canvas" width="200" height="200"></canvas>
+      <div class="clock-center">
+        <div class="clock-time" id="clock-time">00:00</div>
+        <div class="clock-secs" id="clock-secs">00</div>
+        <div class="clock-sub" id="clock-greeting">Dobré ráno</div>
+      </div>
+    </div>
+    <div class="clock-footer-row">
+      <div class="clock-date" id="clock-date">—</div>
+      <div class="clock-day"  id="clock-day">—</div>
+    </div>
+  </div>
+
+  <!-- ── STOPKY ── -->
+  <div class="mode-panel" id="panel-stopwatch">
+    <div class="sw-display" id="sw-display">00:00</div>
+    <div class="sw-ms" id="sw-ms">.00</div>
+    <div class="sw-laps" id="sw-laps"></div>
+    <div class="btn-row">
+      <button class="btn primary" id="sw-start">Start</button>
+      <button class="btn" id="sw-lap" data-i18n="clock.lap">Kolo</button>
+      <button class="btn danger" id="sw-reset" data-i18n="clock.reset">Reset</button>
+    </div>
+  </div>
+
+  <!-- ── ODPOČET ── -->
+  <div class="mode-panel" id="panel-countdown">
+    <div class="cd-display running" id="cd-display">00:00:00</div>
+    <div class="cd-label" id="cd-label" data-i18n="clock.setTimeAndStart">nastav čas a spusť</div>
+    <div class="cd-set" id="cd-set">
+      <div class="cd-set-group">
+        <div class="cd-set-label" data-i18n="clock.hoursLabel">HOD</div>
+        <input class="cd-set-input" id="cd-h" type="number" min="0" max="23" value="0">
+      </div>
+      <div class="cd-sep">:</div>
+      <div class="cd-set-group">
+        <div class="cd-set-label" data-i18n="clock.minutesLabel">MIN</div>
+        <input class="cd-set-input" id="cd-m" type="number" min="0" max="59" value="5">
+      </div>
+      <div class="cd-sep">:</div>
+      <div class="cd-set-group">
+        <div class="cd-set-label" data-i18n="clock.secondsLabel">SEK</div>
+        <input class="cd-set-input" id="cd-s" type="number" min="0" max="59" value="0">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" id="cd-start">Start</button>
+      <button class="btn danger"  id="cd-reset" data-i18n="clock.reset">Reset</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── PŘEPÍNAČ ──
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.mode).classList.add('active');
+  });
+});
+
+// ── HODINY ──
+const ringCanvas = document.getElementById('ring-canvas');
+const rctx = ringCanvas.getContext('2d');
+const RCX = 100, RCY = 100;
+
+function drawRings(h, m, s) {
+  rctx.clearRect(0,0,200,200);
+  const secP  = s / 60;
+  const minP  = (m + s/60) / 60;
+  const hourP = ((h % 12) + m/60) / 12;
+
+  function ring(r, lw, progress, color, glow, glowBlur) {
+    rctx.beginPath();
+    rctx.arc(RCX,RCY,r,0,Math.PI*2);
+    rctx.strokeStyle = 'rgba(200,160,60,0.05)';
+    rctx.lineWidth = lw; rctx.setLineDash([]); rctx.stroke();
+    if (progress <= 0) return;
+    const start = -Math.PI/2, end = start + progress * Math.PI * 2;
+    rctx.save();
+    rctx.shadowColor = glow; rctx.shadowBlur = glowBlur;
+    rctx.beginPath(); rctx.arc(RCX,RCY,r,start,end);
+    rctx.strokeStyle = color; rctx.lineWidth = lw; rctx.lineCap = 'round'; rctx.stroke();
+    const ex = RCX + r*Math.cos(end), ey = RCY + r*Math.sin(end);
+    rctx.beginPath(); rctx.arc(ex,ey,lw*0.7,0,Math.PI*2);
+    rctx.fillStyle = color; rctx.fill(); rctx.restore();
+  }
+
+  // Značky
+  for (let i=0;i<12;i++) {
+    const a = (i/12)*Math.PI*2 - Math.PI/2;
+    const rx = RCX + 95*Math.cos(a), ry = RCY + 95*Math.sin(a);
+    rctx.beginPath(); rctx.arc(rx,ry, i%3===0?1.5:0.8, 0, Math.PI*2);
+    rctx.fillStyle = i%3===0?'rgba(200,160,60,0.4)':'rgba(200,160,60,0.15)';
+    rctx.fill();
+  }
+
+  ring(88, 2.5, secP,  '#2fe0ff', 'rgba(47,224,255,0.9)', 14);
+  ring(77, 4,   minP,  '#ff2fd0', 'rgba(255,47,208,0.9)', 18);
+  ring(65, 5.5, hourP, '#4060ff', 'rgba(64,96,255,0.9)', 20);
+}
+
+function getGreeting(h) {
+  if (h>=5&&h<10) return ksT('clock.greetings.morning','Dobré ráno');
+  if (h>=10&&h<12) return ksT('clock.greetings.forenoon','Dopoledne');
+  if (h>=12&&h<14) return ksT('clock.greetings.noon','Dobré poledne');
+  if (h>=14&&h<18) return ksT('clock.greetings.afternoon','Dobré odpoledne');
+  if (h>=18&&h<22) return ksT('clock.greetings.evening','Dobrý večer');
+  return ksT('clock.greetings.night','Dobrou noc');
+}
+
+function updateClock() {
+  const now = new Date();
+  const h=now.getHours(), m=now.getMinutes(), s=now.getSeconds();
+  document.getElementById('clock-time').textContent = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+  document.getElementById('clock-secs').textContent = String(s).padStart(2,'0');
+  document.getElementById('clock-greeting').textContent = getGreeting(h);
+  const days=ksT('common.days', ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota']);
+  const months=ksT('common.months', ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince']);
+  document.getElementById('clock-date').textContent = `${now.getDate()}. ${months[now.getMonth()]}`;
+  document.getElementById('clock-day').textContent = days[now.getDay()];
+  drawRings(h,m,s);
+}
+
+// ── STOPKY ──
+let swRunning = false, swStart = 0, swElapsed = 0, swInterval = null, swLaps = [];
+
+function swFormat(ms) {
+  const tot = Math.floor(ms/10);
+  const cs = tot % 100;
+  const s  = Math.floor(tot/100) % 60;
+  const m  = Math.floor(tot/6000);
+  return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+function swFormatMs(ms) { return '.'+String(Math.floor(ms/10)%100).padStart(2,'0'); }
+
+function swTick() {
+  const elapsed = swElapsed + (Date.now() - swStart);
+  document.getElementById('sw-display').textContent = swFormat(elapsed);
+  document.getElementById('sw-ms').textContent = swFormatMs(elapsed);
+}
+
+document.getElementById('sw-start').addEventListener('click', () => {
+  const btn = document.getElementById('sw-start');
+  if (!swRunning) {
+    swStart = Date.now();
+    swInterval = setInterval(swTick, 10);
+    swRunning = true;
+    btn.textContent = ksT('clock.stop','Stop'); btn.classList.remove('primary'); btn.classList.add('danger');
+  } else {
+    swElapsed += Date.now() - swStart;
+    clearInterval(swInterval); swRunning = false;
+    btn.textContent = ksT('clock.start','Start'); btn.classList.remove('danger'); btn.classList.add('primary');
+  }
+});
+
+document.getElementById('sw-lap').addEventListener('click', () => {
+  if (!swRunning) return;
+  const elapsed = swElapsed + (Date.now() - swStart);
+  swLaps.push(swFormat(elapsed) + swFormatMs(elapsed));
+  const lapsEl = document.getElementById('sw-laps');
+  lapsEl.innerHTML = swLaps.map((l,i) =>
+    `<div class="sw-lap"><span># ${i+1}</span><span>${l}</span></div>`
+  ).reverse().join('');
+});
+
+document.getElementById('sw-reset').addEventListener('click', () => {
+  clearInterval(swInterval); swRunning = false; swElapsed = 0; swLaps = [];
+  document.getElementById('sw-display').textContent = '00:00';
+  document.getElementById('sw-ms').textContent = '.00';
+  document.getElementById('sw-laps').innerHTML = '';
+  const btn = document.getElementById('sw-start');
+  btn.textContent = ksT('clock.start','Start'); btn.classList.remove('danger'); btn.classList.add('primary');
+});
+
+// ── ODPOČET ──
+let cdRunning = false, cdRemaining = 0, cdInterval = null;
+
+function cdFormat(ms) {
+  const s = Math.ceil(ms/1000);
+  const sec = s % 60, min = Math.floor(s/60) % 60, hr = Math.floor(s/3600);
+  return String(hr).padStart(2,'0')+':'+String(min).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+}
+
+function cdTick() {
+  cdRemaining -= 100;
+  if (cdRemaining <= 0) {
+    cdRemaining = 0;
+    clearInterval(cdInterval); cdRunning = false;
+    document.getElementById('cd-display').textContent = '00:00:00';
+    document.getElementById('cd-display').className = 'cd-display done';
+    document.getElementById('cd-label').textContent = '⏰ '+ksT('clock.timeUp','Čas vypršel!');
+    document.getElementById('cd-start').textContent = ksT('clock.start','Start');
+    document.getElementById('cd-start').classList.add('primary');
+    // Web notification pokud povolena
+    if (Notification.permission === 'granted') {
+      new Notification('Dashboard K-S', { body: ksT('clock.notificationBody','Odpočet vypršel!'), icon: '' });
+    }
+    return;
+  }
+  document.getElementById('cd-display').textContent = cdFormat(cdRemaining);
+  const pct = Math.round((cdRemaining / cdTotalMs) * 100);
+  document.getElementById('cd-label').textContent = `${pct}% ${ksT('clock.percentRemaining','zbývá')}`;
+}
+
+let cdTotalMs = 0;
+
+document.getElementById('cd-start').addEventListener('click', () => {
+  const btn = document.getElementById('cd-start');
+  if (!cdRunning) {
+    const h = parseInt(document.getElementById('cd-h').value)||0;
+    const m = parseInt(document.getElementById('cd-m').value)||0;
+    const s = parseInt(document.getElementById('cd-s').value)||0;
+    const total = (h*3600 + m*60 + s) * 1000;
+    if (total <= 0) return;
+    if (cdRemaining <= 0) { cdRemaining = total; cdTotalMs = total; }
+    document.getElementById('cd-set').style.display = 'none';
+    document.getElementById('cd-display').className = 'cd-display running';
+    cdInterval = setInterval(cdTick, 100);
+    cdRunning = true;
+    btn.textContent = ksT('clock.pause','Pauza'); btn.classList.remove('primary');
+    // Požádat o notifikace
+    if (Notification.permission === 'default') Notification.requestPermission();
+  } else {
+    clearInterval(cdInterval); cdRunning = false;
+    btn.textContent = ksT('clock.resume','Pokračovat'); btn.classList.add('primary');
+  }
+});
+
+document.getElementById('cd-reset').addEventListener('click', () => {
+  clearInterval(cdInterval); cdRunning = false; cdRemaining = 0; cdTotalMs = 0;
+  document.getElementById('cd-display').textContent = '00:00:00';
+  document.getElementById('cd-display').className = 'cd-display running';
+  document.getElementById('cd-label').textContent = ksT('clock.setTimeAndStart','nastav čas a spusť');
+  document.getElementById('cd-set').style.display = 'flex';
+  const btn = document.getElementById('cd-start');
+  btn.textContent = ksT('clock.start','Start'); btn.classList.add('primary');
+});
+
+// ── INIT ──
+updateClock();
+setInterval(updateClock, 1000);
+
+window.addEventListener('ks-lang-applied', () => { updateClock(); });
+
+// Když je tahle dlaždice na dashboardu "připnutá" (zvětšená přes tlačítko Rozbalit),
+// zvětši záložky Čas/Stopky/Odpočet, ať se na počítači líp trefí myší.
+function ksSyncPinState() {
+  try {
+    const frame = window.frameElement;
+    if (!frame) return;
+    const tile = frame.closest('.tile, .flip-tile');
+    if (!tile) return;
+    document.body.classList.toggle('ks-pinned', tile.classList.contains('pinned'));
+  } catch (e) { /* ignorovat */ }
+}
+try {
+  const frame = window.frameElement;
+  const tile = frame && frame.closest('.tile, .flip-tile');
+  if (tile) {
+    ksSyncPinState();
+    new MutationObserver(ksSyncPinState).observe(tile, { attributes: true, attributeFilter: ['class'] });
+  }
+} catch (e) {}
+</script>
+</body>
+</html>

@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Deník Widget</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    height: 100%;
+  }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0;
+    margin: 0;
+  }
+
+  .diary-card {
+    width: 100%;
+    height: 100%;
+    border-radius: 18px;
+    padding: 18px 20px;
+    position: relative;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .diary-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  /* Header */
+  .diary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  .diary-label {
+    font-size: 9px; letter-spacing: 3px; color: #f0d890;
+    text-transform: uppercase; font-family: var(--sans);
+    font-weight: 600; text-shadow: 0 0 8px rgba(240,216,80,0.4);
+  }
+  .diary-nav { display: flex; align-items: center; gap: 8px; }
+  .diary-nav-btn {
+    background: transparent; border: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text); width: 22px; height: 22px;
+    border-radius: 4px; cursor: pointer; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .diary-nav-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .diary-nav-btn:disabled { opacity: 0.2; cursor: default; }
+  .diary-date-label {
+    font-family: var(--sans); font-size: 12px; font-weight: 600;
+    color: var(--gold); letter-spacing: 1px; min-width: 130px; text-align: center;
+    cursor: pointer;
+  }
+  .diary-date-label:hover { opacity: 0.8; }
+  .diary-today-btn {
+    font-size: 8px; color: var(--gold-text); letter-spacing: 1px;
+    background: transparent; border: 1px solid rgba(200,160,60,0.15);
+    cursor: pointer; font-family: var(--mono);
+    padding: 2px 6px; border-radius: 4px; transition: all 0.15s;
+  }
+  .diary-today-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* Tagy v hlavičce */
+  .diary-tags-row {
+    display: flex; gap: 5px; flex-wrap: wrap;
+    margin-bottom: 10px; flex-shrink: 0;
+    align-items: center;
+  }
+  .diary-tag {
+    font-size: 11px; letter-spacing: 1px; padding: 4px 12px;
+    border-radius: 10px; cursor: pointer; font-family: var(--mono);
+    transition: all 0.15s; border: 1px solid rgba(200,160,60,0.2);
+    background: transparent; color: var(--gold-text);
+  }
+  .diary-tag:hover { filter: brightness(1.3); }
+  .diary-tag.active { font-weight: 600; }
+  .diary-tag-edit-btn {
+    font-size: 11px; color: var(--gold-text); background: transparent;
+    border: 1px dashed rgba(200,160,60,0.15); padding: 4px 12px;
+    border-radius: 10px; cursor: pointer; font-family: var(--mono);
+    transition: all 0.15s;
+  }
+  .diary-tag-edit-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* Posuvník */
+  .diary-slider-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px; flex-shrink: 0;
+  }
+  .diary-slider-label {
+    font-size: 9px; color: var(--gold-text); letter-spacing: 1px;
+    white-space: nowrap; cursor: pointer; transition: color 0.15s;
+    min-width: 60px;
+  }
+  .diary-slider-label:hover { color: var(--gold); }
+  .diary-slider {
+    flex: 1; height: 3px; appearance: none;
+    background: rgba(200,160,60,0.15); border-radius: 2px; outline: none; cursor: pointer;
+  }
+  .diary-slider::-webkit-slider-thumb {
+    appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--gold);
+    box-shadow: 0 0 6px rgba(200,160,60,0.5);
+    cursor: pointer;
+  }
+  .diary-slider::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--gold); border: none;
+    box-shadow: 0 0 6px rgba(200,160,60,0.5);
+  }
+  .diary-slider-val {
+    font-family: var(--sans); font-size: 16px; font-weight: 700;
+    color: var(--gold); min-width: 20px; text-align: right;
+  }
+
+  /* Textarea */
+  .diary-textarea {
+    flex: 1; resize: none;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(200,160,60,0.1);
+    border-radius: 8px; padding: 10px 12px;
+    color: var(--gold-text); font-family: var(--mono);
+    font-size: 13px; font-family: var(--mono); line-height: 1.7; outline: none;
+    transition: border-color 0.2s;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(200,160,60,0.2) transparent;
+  }
+  .diary-textarea:focus { border-color: rgba(200,160,60,0.3); }
+  .diary-textarea::placeholder { color: var(--gold-text); font-style: italic; }
+
+  /* Footer */
+  .diary-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 8px; flex-shrink: 0;
+  }
+  .diary-save-status {
+    font-size: 9px; color: var(--gold-text); letter-spacing: 1px;
+    transition: color 0.3s;
+  }
+  .diary-save-status.saved {
+    color: #2ecc8f;
+    font-weight: 700;
+  }
+  .diary-char-count { font-size: 8px; color: var(--gold-text); letter-spacing: 1px; }
+
+  /* Nastavení štítků */
+  .diary-settings {
+    display: none; flex-shrink: 0;
+    border-top: 1px solid rgba(200,160,60,0.1);
+    padding-top: 10px; margin-top: 6px;
+    flex-direction: column; gap: 8px;
+  }
+  .diary-settings.open { display: flex; }
+  .diary-settings-title {
+    font-size: 9px; letter-spacing: 2px; color: var(--gold);
+    text-transform: uppercase; font-family: var(--sans);
+  }
+  .diary-settings-row { display: flex; gap: 8px; align-items: center; }
+  .diary-settings-label { font-size: 9px; color: var(--gold-text); letter-spacing: 1px; min-width: 80px; }
+  .diary-settings-input {
+    flex: 1; background: transparent;
+    border: none; border-bottom: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text); font-family: var(--mono); font-size: 10px;
+    padding: 3px 4px; outline: none; transition: border-color 0.2s;
+  }
+  .diary-settings-input:focus { border-color: var(--gold); }
+  .diary-settings-hint { font-size: 8px; color: var(--gold-text); letter-spacing: 1px; font-style: italic; }
+  .diary-settings-save {
+    background: rgba(200,160,60,0.12); border: 1px solid var(--gold-dim);
+    color: var(--gold); font-family: var(--mono); font-size: 9px;
+    padding: 4px 12px; border-radius: 4px; cursor: pointer; align-self: flex-end;
+  }
+  .diary-settings-save:hover { background: rgba(200,160,60,0.22); }
+
+  /* Editor štítků */
+  .ds-tag-list {
+    display: flex; flex-direction: column; gap: 3px;
+    margin-bottom: 6px;
+  }
+  .ds-tag-edit-row {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(0,0,0,0.2); border-radius: 5px;
+    padding: 3px 8px;
+  }
+  .ds-tag-color-dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  }
+  .ds-tag-edit-name {
+    font-size: 10px; color: var(--gold-text); flex: 1;
+  }
+  .ds-tag-remove {
+    background: transparent; border: none; color: var(--gold-text);
+    cursor: pointer; font-size: 10px; padding: 2px 4px;
+    transition: color 0.15s;
+  }
+  .ds-tag-remove:hover { color: #e05050; }
+
+  .ds-tag-add-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 10px;
+  }
+  .ds-color-picker {
+    display: flex; gap: 3px; flex-shrink: 0;
+  }
+  .ds-swatch {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid transparent; cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+    padding: 0;
+  }
+  .ds-swatch:hover { transform: scale(1.15); }
+  .ds-swatch.selected { border-color: #fff; transform: scale(1.15); }
+  .ds-tag-add-btn {
+    background: rgba(200,160,60,0.12); border: 1px solid var(--gold-dim);
+    color: var(--gold); font-family: var(--mono); font-size: 9px;
+    padding: 4px 10px; border-radius: 4px; cursor: pointer; flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .ds-tag-add-btn:hover { background: rgba(200,160,60,0.22); }
+  /* Archiv */
+  .diary-archive {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease, margin-bottom 0.25s ease;
+    margin-bottom: 0;
+    flex-shrink: 0;
+  }
+  .diary-archive.open {
+    max-height: 140px;
+    margin-bottom: 8px;
+  }
+  .diary-archive-search {
+    width: 100%;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(200,160,60,0.15);
+    border-radius: 6px;
+    color: var(--gold-text);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 5px 8px;
+    outline: none;
+    margin-bottom: 6px;
+  }
+  .diary-archive-search:focus { border-color: var(--gold); }
+  .diary-archive-search::placeholder { color: var(--gold-text); }
+  .diary-archive-list {
+    max-height: 95px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(200,160,60,0.4) transparent;
+  }
+  .diary-archive-list::-webkit-scrollbar { width: 5px; }
+  .diary-archive-list::-webkit-scrollbar-thumb { background: rgba(200,160,60,0.4); border-radius: 3px; }
+  .diary-archive-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(200,160,60,0.06);
+    transition: background 0.15s;
+  }
+  .diary-archive-item:hover { background: rgba(200,160,60,0.08); }
+  .diary-archive-item.active { background: rgba(200,160,60,0.15); }
+  .diary-archive-date {
+    font-size: 9px; color: var(--gold); flex-shrink: 0; width: 50px;
+  }
+  .diary-archive-tags {
+    display: flex; gap: 3px; flex-shrink: 0;
+  }
+  .diary-archive-tag {
+    font-size: 7px; padding: 1px 4px; border-radius: 3px;
+    border: 1px solid rgba(200,160,60,0.4);
+    white-space: nowrap;
+  }
+  .diary-archive-preview {
+    font-size: 9px; color: var(--gold-text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1; min-width: 0;
+  }
+  .diary-archive-empty {
+    font-size: 9px; color: var(--gold-text); font-style: italic;
+    text-align: center; padding: 10px;
+  }
+</style>
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+</head>
+<body>
+
+<div class="diary-card">
+  <div class="diary-header">
+    <div class="diary-label" data-i18n="diary.title">Deník</div>
+    <div class="diary-nav">
+      <button class="diary-nav-btn" id="diary-prev">‹</button>
+      <div class="diary-date-label" id="diary-date-label">—</div>
+      <button class="diary-nav-btn" id="diary-next" disabled>›</button>
+      <button class="diary-today-btn" id="diary-today" data-i18n="diary.today">dnes</button>
+      <button class="diary-today-btn" id="diary-archive-toggle" data-i18n="diary.archiveBtn">📂 archiv</button>
+    </div>
+  </div>
+
+  <!-- Archiv (sbalovací) -->
+  <div class="diary-archive" id="diary-archive">
+    <input type="text" class="diary-archive-search" id="diary-archive-search" placeholder="🔍 hledat v zápisech..." data-i18n-placeholder="diary.searchPlaceholder">
+    <div class="diary-archive-list" id="diary-archive-list"></div>
+  </div>
+
+  <!-- Tagy -->
+  <div class="diary-tags-row" id="diary-tags-row"></div>
+
+  <!-- Posuvník -->
+  <div class="diary-slider-row">
+    <div class="diary-slider-label" id="slider-label" title="Klikni pro nastavení" data-i18n-title="diary.clickForSettings">Nálada</div>
+    <input type="range" class="diary-slider" id="diary-slider" min="1" max="10" value="5">
+    <div class="diary-slider-val" id="diary-slider-val">5</div>
+  </div>
+
+  <!-- Text -->
+  <textarea class="diary-textarea" id="diary-text" spellcheck="false" placeholder="Jak byl dnešní den?
+
+💡 Tip: Tagy, název posuvníku i štítky si můžeš přejmenovat — klikni na ✎ nastavení.
+Posuvník nemusí být nálada — může to být produktivita, energie, stres, cokoli chceš.
+Tagy také — třeba: #práce #sport #rodina nebo #spanek #jidlo #uceni..."></textarea>
+
+  <!-- Footer -->
+  <div class="diary-footer">
+    <div class="diary-footer-left" style="display:flex;gap:10px;align-items:center;">
+      <div class="diary-save-status" id="diary-save-status" data-i18n="diary.autoSave">// auto-save</div>
+      <button id="diary-spell-btn" style="font-size:8px;color:var(--gold-text);letter-spacing:1px;background:transparent;border:1px solid rgba(200,160,60,0.15);cursor:pointer;font-family:var(--mono);padding:2px 7px;border-radius:4px;transition:all 0.15s;" title="Zapnout/vypnout kontrolu pravopisu" data-i18n-title="diary.spellcheckToggle">ABC ✗</button>
+    </div>
+    <div class="diary-char-count" id="diary-char-count">0 znaků</div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY  = 'ks-diary';
+const SETTINGS_KEY = 'ks-diary-settings';
+
+function DAYS()   { return ksT('common.days', ['Neděle','Pondělí','Úterý','Středa','Čtvrtek','Pátek','Sobota']); }
+function MONTHS() { return ksT('common.months', ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince']); }
+
+function TAG_PALETTE() {
+  return [
+    { name: ksT('diary.tagPaletteNames.gold', 'zlatá'),      val: '#c8a03c' },
+    { name: ksT('diary.tagPaletteNames.green', 'zelená'),    val: '#2ecc8f' },
+    { name: ksT('diary.tagPaletteNames.blue', 'modrá'),      val: '#4a9eff' },
+    { name: ksT('diary.tagPaletteNames.red', 'červená'),     val: '#e05050' },
+    { name: ksT('diary.tagPaletteNames.purple', 'fialová'),  val: '#b07ce0' },
+    { name: ksT('diary.tagPaletteNames.orange', 'oranžová'), val: '#e0954a' },
+    { name: ksT('diary.tagPaletteNames.turquoise', 'tyrkysová'), val: '#3ecbc9' },
+    { name: ksT('diary.tagPaletteNames.pink', 'růžová'),     val: '#e066a8' },
+  ];
+}
+
+function defaultTags() {
+  return [
+    { name: ksT('diary.defaultTags.free', 'Volno'),        color: '#c8a03c' },
+    { name: ksT('diary.defaultTags.work', 'Práce'),         color: '#2ecc8f' },
+    { name: ksT('diary.defaultTags.training', 'Trénink'),   color: '#4a9eff' },
+    { name: ksT('diary.defaultTags.sick', 'Nemoc'),         color: '#e05050' },
+    { name: ksT('diary.defaultTags.trip', 'Výlet'),         color: '#b07ce0' },
+  ];
+}
+
+let entries  = {};
+let settings = {
+  sliderLabel: 'Nálada',
+  tags: defaultTags(),
+};
+let currentDate = todayStr();
+let saveTimer   = null;
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function load() {
+  try { entries  = JSON.parse(localStorage.getItem(STORAGE_KEY)  || '{}'); } catch { entries = {}; }
+  try {
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (s) settings = { ...settings, ...s };
+  } catch {}
+  // Migrace starých string tagů na objekty {name, color}
+  if (settings.tags && settings.tags.length && typeof settings.tags[0] === 'string') {
+    settings.tags = settings.tags.map((name, i) => ({
+      name, color: TAG_PALETTE()[i % TAG_PALETTE().length].val
+    }));
+  }
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  const status = document.getElementById('diary-save-status');
+  status.textContent = ksT('diary.autoSaveDone', '// auto-save ✓');
+  status.classList.add('saved');
+  setTimeout(() => { status.textContent = ksT('diary.autoSave', '// auto-save'); status.classList.remove('saved'); }, 1800);
+}
+
+function saveSettings() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+function fmtDate(str) {
+  const [y,m,d] = str.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  return `${DAYS()[dt.getDay()]} ${d}. ${MONTHS()[m-1]}`;
+}
+
+// ── RENDER ──
+function render() {
+  const entry = entries[currentDate] || { text: '', slider: 5, tags: [] };
+  const today = todayStr();
+
+  // Datum
+  document.getElementById('diary-date-label').textContent = fmtDate(currentDate);
+  document.getElementById('diary-next').disabled = currentDate >= today;
+
+  // Text
+  const ta = document.getElementById('diary-text');
+  ta.value = entry.text || '';
+  ta.placeholder = `${ksT('diary.howWasToday','Jak byl dnešní den?')}\n\n${ksT('diary.settingsTip','💡 Tip: Tagy, název posuvníku i štítky si můžeš přejmenovat — klikni na ✎ nastavení.')}\n${ksT('diary.sliderHint','Posuvník nemusí být nálada — může to být produktivita, energie, stres, cokoli chceš.')}\n${ksT('diary.tagsHint','Tagy také — třeba: #práce #sport #rodina nebo #spanek #jidlo #uceni...')}`;
+  document.getElementById('diary-char-count').textContent = `${ta.value.length} ${ksT('diary.charsCount','znaků')}`;
+
+  // Posuvník
+  document.getElementById('slider-label').textContent = settings.sliderLabel;
+  document.getElementById('diary-slider').value = entry.slider || 5;
+  document.getElementById('diary-slider-val').textContent = entry.slider || 5;
+
+  // Tagy
+  renderTags(entry.tags || []);
+}
+
+function renderTags(activeTags) {
+  const row = document.getElementById('diary-tags-row');
+  row.innerHTML = settings.tags.map(tag => {
+    const isActive = activeTags.includes(tag.name);
+    const c = tag.color || '#c8a03c';
+    return `<button class="diary-tag ${isActive?'active':''}" data-tag="${tag.name}"
+      style="border-color:${c}66; color:${isActive ? c : c+'aa'}; ${isActive ? `background:${c}22;` : ''}">${tag.name}</button>`;
+  }).join('') +
+  `<button class="diary-tag-edit-btn" id="diary-settings-btn">✎ ${ksT('diary.tagSettings','nastavení')}</button>`;
+
+  row.querySelectorAll('[data-tag]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const entry = entries[currentDate] || { text: '', slider: 5, tags: [] };
+      const tags  = entry.tags || [];
+      const idx   = tags.indexOf(btn.dataset.tag);
+      if (idx >= 0) tags.splice(idx, 1); else tags.push(btn.dataset.tag);
+      entry.tags = tags;
+      entries[currentDate] = entry;
+      save(); renderTags(tags);
+    });
+  });
+
+  document.getElementById('diary-settings-btn').addEventListener('click', () => {
+    const panel = document.getElementById('diary-settings-panel');
+    if (panel) {
+      panel.classList.toggle('open');
+      if (panel.classList.contains('open')) populateSettings();
+    }
+  });
+}
+
+// ── NAVIGACE ──
+function goDate(str) {
+  currentDate = str;
+  render();
+  // Skrýt nastavení
+  const panel = document.getElementById('diary-settings-panel');
+  if (panel) panel.classList.remove('open');
+}
+
+document.getElementById('diary-prev').addEventListener('click', () => {
+  const d = new Date(currentDate);
+  d.setDate(d.getDate() - 1);
+  goDate(d.toISOString().slice(0,10));
+});
+document.getElementById('diary-next').addEventListener('click', () => {
+  const d = new Date(currentDate);
+  d.setDate(d.getDate() + 1);
+  const next = d.toISOString().slice(0,10);
+  if (next <= todayStr()) goDate(next);
+});
+document.getElementById('diary-today').addEventListener('click', () => goDate(todayStr()));
+
+// ── AUTO-SAVE ──
+document.getElementById('diary-text').addEventListener('input', () => {
+  const ta = document.getElementById('diary-text');
+  document.getElementById('diary-char-count').textContent = `${ta.value.length} znaků`;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const entry = entries[currentDate] || { text: '', slider: 5, tags: [] };
+    entry.text = ta.value;
+    entries[currentDate] = entry;
+    save();
+  }, 2000);
+});
+
+document.getElementById('diary-slider').addEventListener('input', () => {
+  const val = document.getElementById('diary-slider').value;
+  document.getElementById('diary-slider-val').textContent = val;
+  const entry = entries[currentDate] || { text: '', slider: 5, tags: [] };
+  entry.slider = parseInt(val);
+  entries[currentDate] = entry;
+  save();
+});
+
+// ── SETTINGS PANEL (dynamicky přidán) ──
+let tempTags = []; // pracovní kopie tagů při editaci
+
+function buildSettingsPanel() {
+  const existing = document.getElementById('diary-settings-panel');
+  const wasOpen = existing ? existing.classList.contains('open') : false;
+  if (existing) existing.remove();
+
+  const panel = document.createElement('div');
+  panel.id = 'diary-settings-panel';
+  panel.className = 'diary-settings';
+  panel.innerHTML = `
+    <div class="diary-settings-title">${ksT('diary.customization','Přizpůsobení')}</div>
+    <div class="diary-settings-row">
+      <span class="diary-settings-label">${ksT('diary.sliderNameLabel','Název posuvníku:')}</span>
+      <input class="diary-settings-input" id="ds-slider-label" value="${settings.sliderLabel}" placeholder="${ksT('diary.sliderNamePlaceholder','Nálada, Energie, Produktivita...')}">
+    </div>
+    <div class="diary-settings-hint">${ksT('diary.sliderHint','Posuvník může být cokoli — nálada, energie, stres, produktivita, kvalita spánku...')}</div>
+
+    <div class="diary-settings-label" style="margin-top:6px;">${ksT('diary.tagsInHeader','Štítky (tagy):')}</div>
+    <div class="ds-tag-list" id="ds-tag-list"></div>
+
+    <div class="ds-tag-add-row">
+      <input class="diary-settings-input" id="ds-new-tag-name" placeholder="${ksT('diary.newTagPlaceholder','Název nového štítku...')}" style="flex:1;">
+      <div class="ds-color-picker" id="ds-color-picker"></div>
+      <button class="ds-tag-add-btn" id="ds-tag-add-btn">+ ${ksT('common.add','přidat')}</button>
+    </div>
+
+    <button class="diary-settings-save" id="ds-save">${ksT('diary.saveSettings','Uložit nastavení')}</button>
+  `;
+  document.querySelector('.diary-card').appendChild(panel);
+
+  document.getElementById('ds-save').addEventListener('click', () => {
+    settings.sliderLabel = document.getElementById('ds-slider-label').value.trim() || ksT('diary.moodDefault', 'Nálada');
+    settings.tags = tempTags.slice();
+    saveSettings(); panel.classList.remove('open');
+    render();
+  });
+
+  if (wasOpen) { panel.classList.add('open'); populateSettings(); }
+}
+
+function populateSettings() {
+  document.getElementById('ds-slider-label').value = settings.sliderLabel;
+  tempTags = settings.tags.map(t => ({...t}));
+  renderTagEditor();
+  renderColorPicker();
+}
+
+let selectedNewColor = TAG_PALETTE()[0].val;
+
+function renderColorPicker() {
+  const picker = document.getElementById('ds-color-picker');
+  picker.innerHTML = TAG_PALETTE().map(c =>
+    `<button type="button" class="ds-swatch ${c.val===selectedNewColor?'selected':''}" data-color="${c.val}" style="background:${c.val}" title="${c.name}"></button>`
+  ).join('');
+  picker.querySelectorAll('.ds-swatch').forEach(sw => {
+    sw.addEventListener('click', () => {
+      selectedNewColor = sw.dataset.color;
+      renderColorPicker();
+    });
+  });
+}
+
+function renderTagEditor() {
+  const list = document.getElementById('ds-tag-list');
+  list.innerHTML = tempTags.map((t, i) => `
+    <div class="ds-tag-edit-row">
+      <span class="ds-tag-color-dot" style="background:${t.color}"></span>
+      <span class="ds-tag-edit-name">${t.name}</span>
+      <button type="button" class="ds-tag-remove" data-idx="${i}" title="${ksT('diary.removeTag','Odebrat')}">✕</button>
+    </div>
+  `).join('');
+  list.querySelectorAll('.ds-tag-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tempTags.splice(Number(btn.dataset.idx), 1);
+      renderTagEditor();
+    });
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.id === 'ds-tag-add-btn') {
+    const input = document.getElementById('ds-new-tag-name');
+    const name = input.value.trim();
+    if (!name) return;
+    tempTags.push({ name, color: selectedNewColor });
+    input.value = '';
+    renderTagEditor();
+  }
+});
+
+// ── UKÁZKOVÝ ZÁPIS ──
+function addSampleEntry() {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yStr = yesterday.toISOString().slice(0,10);
+  if (!entries[yStr]) {
+    entries[yStr] = {
+      text: ksT('diary.sampleEntryText', 'Dnes jsem si konečně udělal čas na projekt K-S dashboard. Práce šla dobře, zvládl jsem RSS widget a začal záruky. Večer krátká procházka, pak kefír a čtení.\n\nPosuvník (Nálada) jde od 1 do 10 — dnes solidních 7. Tagy si přejmenuj jak chceš v ⚙ nastavení. Třeba místo "Trénink" dej "Jóga" nebo "Běh". Místo "Volno" klidně "Relax" nebo "Rodina".'),
+      slider: 7,
+      tags: [ksT('diary.defaultTags.work', 'Práce'), ksT('diary.defaultTags.training', 'Trénink')],
+    };
+    save();
+  }
+}
+
+// ── ARCHIV ──
+const archiveToggle = document.getElementById('diary-archive-toggle');
+const archivePanel  = document.getElementById('diary-archive');
+const archiveSearch = document.getElementById('diary-archive-search');
+const archiveList   = document.getElementById('diary-archive-list');
+
+archiveToggle.addEventListener('click', () => {
+  archivePanel.classList.toggle('open');
+  if (archivePanel.classList.contains('open')) {
+    renderArchive();
+    archiveSearch.focus();
+  }
+});
+
+archiveSearch.addEventListener('input', () => renderArchive(archiveSearch.value.trim().toLowerCase()));
+
+function renderArchive(filter = '') {
+  const dates = Object.keys(entries)
+    .filter(d => entries[d] && (entries[d].text || (entries[d].tags && entries[d].tags.length)))
+    .sort((a,b) => b.localeCompare(a)); // nejnovější první
+
+  const filtered = dates.filter(d => {
+    if (!filter) return true;
+    const e = entries[d];
+    const inText = (e.text || '').toLowerCase().includes(filter);
+    const inTags = (e.tags || []).some(t => t.toLowerCase().includes(filter));
+    const inDate = d.includes(filter);
+    return inText || inTags || inDate;
+  });
+
+  if (!filtered.length) {
+    archiveList.innerHTML = `<div class="diary-archive-empty">${ksT('diary.noEntries', '// žádné zápisy')}</div>`;
+    return;
+  }
+
+  archiveList.innerHTML = filtered.map(d => {
+    const e = entries[d];
+    const [y,m,dd] = d.split('-');
+    const tagsHtml = (e.tags || []).map(tName => {
+      const tagDef = settings.tags.find(t => t.name === tName);
+      const c = tagDef ? tagDef.color : '#c8a03c';
+      return `<span class="diary-archive-tag" style="border-color:${c}66;color:${c};">${tName}</span>`;
+    }).join('');
+    const preview = (e.text || '').replace(/\s+/g,' ').trim();
+    const isActive = d === currentDate ? 'active' : '';
+    return `<div class="diary-archive-item ${isActive}" data-date="${d}">
+      <span class="diary-archive-date">${dd}.${m}.</span>
+      <span class="diary-archive-tags">${tagsHtml}</span>
+      <span class="diary-archive-preview">${preview || '—'}</span>
+    </div>`;
+  }).join('');
+
+  archiveList.querySelectorAll('.diary-archive-item').forEach(item => {
+    item.addEventListener('click', () => {
+      goDate(item.dataset.date);
+      renderArchive(archiveSearch.value.trim().toLowerCase());
+    });
+  });
+}
+let spellcheck = false;
+document.getElementById('diary-spell-btn').addEventListener('click', () => {
+  spellcheck = !spellcheck;
+  const ta  = document.getElementById('diary-text');
+  const btn = document.getElementById('diary-spell-btn');
+  ta.setAttribute('spellcheck', spellcheck ? 'true' : 'false');
+  btn.textContent = spellcheck ? ksT('diary.spellOn','ABC ✓') : ksT('diary.spellOff','ABC ✗');
+  btn.style.color = spellcheck ? 'var(--gold)' : 'var(--gold-text)';
+  btn.style.borderColor = spellcheck ? 'rgba(200,160,60,0.4)' : 'rgba(200,160,60,0.15)';
+  ta.focus();
+});
+
+// Když je tahle dlaždice na dashboardu "připnutá" (zvětšená přes tlačítko Rozbalit),
+// automaticky otevři archiv, ať je vidět rovnou po otevření.
+function ksSyncArchiveWithPinState() {
+  try {
+    const frame = window.frameElement;
+    if (!frame) return; // widget se nezobrazuje v iframe (např. otevřený samostatně)
+    const tile = frame.closest('.tile, .flip-tile');
+    if (!tile) return;
+    const isPinned = tile.classList.contains('pinned');
+    if (isPinned && !archivePanel.classList.contains('open')) {
+      archivePanel.classList.add('open');
+      renderArchive();
+    } else if (!isPinned && archivePanel.classList.contains('open')) {
+      archivePanel.classList.remove('open');
+    }
+  } catch (e) { /* cross-origin nebo jiná neočekávaná situace — tiše ignorovat */ }
+}
+try {
+  const frame = window.frameElement;
+  const tile = frame && frame.closest('.tile, .flip-tile');
+  if (tile) {
+    ksSyncArchiveWithPinState();
+    new MutationObserver(ksSyncArchiveWithPinState).observe(tile, { attributes: true, attributeFilter: ['class'] });
+  }
+} catch (e) {}
+
+// ── INIT ──
+load();
+buildSettingsPanel();
+addSampleEntry();
+render();
+
+// Když se přepne jazyk, překresli texty (a případně otevřený archiv/nastavení)
+window.addEventListener('ks-lang-applied', () => {
+  render();
+  buildSettingsPanel();
+  if (archivePanel.classList.contains('open')) renderArchive(archiveSearch.value.trim().toLowerCase());
+});
+</script>
+</body>
+</html>

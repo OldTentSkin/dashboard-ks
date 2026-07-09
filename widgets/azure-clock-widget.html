@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Hodiny (Azurová)</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --gold:#00c8ff; --gold-dim:rgba(0,200,255,0.3); --gold-text:#c0eeff; --text-dim:#2a5060; --mono:'Share Tech Mono',monospace; --sans:'Rajdhani',sans-serif; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html { height:100%; }
+  body { height:100%; background:transparent; font-family:var(--mono); margin:0; }
+  .az-card { width:100%; height:100%; border-radius:18px; position:relative; border:1px solid var(--gold-dim); background:var(--card-bg, radial-gradient(ellipse at 0% 0%, #0088cc 0%, #003a5a 30%, #000d1a 60%, #000000 100%)); overflow:hidden; display:flex; flex-direction:column; align-items:center; justify-content:center; container-type:size; }
+  .az-card::after { content:''; position:absolute; top:0; left:10%; right:10%; height:1px; background:linear-gradient(90deg,transparent,var(--gold-dim),transparent); z-index:2; }
+  .az-label { position:absolute; top:12px; left:18px; font-size:9px; letter-spacing:3px; color:var(--gold-text); text-transform:uppercase; font-family:var(--sans); font-weight:600; text-shadow:0 0 8px rgba(0,200,255,0.5); z-index:3; }
+  .az-content { position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:2px; }
+  canvas#az-clock { display:block; }
+  .az-date { font-size:9px; color:var(--gold-text); letter-spacing:2px; text-transform:uppercase; opacity:0.65; margin-top:2px; }
+</style>
+</head>
+<body>
+<div class="az-card">
+  <div class="az-label"><span data-i18n="clock.title">Hodiny</span></div>
+  <div class="az-content">
+    <canvas id="az-clock" width="240" height="290"></canvas>
+    <div class="az-date" id="az-date">—</div>
+  </div>
+</div>
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+<script>
+function DAYS(){return ksT('common.daysLower', ['neděle','pondělí','úterý','středa','čtvrtek','pátek','sobota']);}
+function MONTHS(){return ksT('common.months', ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince']);}
+const canvas=document.getElementById('az-clock');
+const ctx=canvas.getContext('2d');
+const W=240, H=290;
+const WCX=108, WCY=178, R=82;
+const TILT=-0.14;
+const SMALL_R=13, SCDY=28;
+const G1='#f5e080', G2='#c8a030', G3='#7a5010', G4='#3a2005';
+
+function getCol(){return getComputedStyle(document.documentElement).getPropertyValue('--gold').trim()||'#00c8ff';}
+function hexRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255];}
+function goldGrad(x1,y1,x2,y2){const g=ctx.createLinearGradient(x1,y1,x2,y2);g.addColorStop(0,G1);g.addColorStop(0.5,G2);g.addColorStop(1,G3);return g;}
+
+const CROWN_X = WCX + (R+10)*Math.sin(TILT);
+const CROWN_Y = WCY - (R+10)*Math.cos(TILT);
+
+function drawWindingCrown(ctx){
+  ctx.save();
+  ctx.translate(CROWN_X, CROWN_Y);
+  ctx.rotate(TILT);
+  const cg=goldGrad(-4,-14,4,4);
+  ctx.beginPath(); ctx.roundRect(-4,-14,8,16,2);
+  ctx.fillStyle=cg; ctx.shadowColor='rgba(200,140,10,0.6)'; ctx.shadowBlur=4; ctx.fill();
+  ctx.strokeStyle=G4; ctx.lineWidth=0.7; ctx.stroke();
+  for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(-3,-3+i*4);ctx.lineTo(3,-3+i*4);ctx.strokeStyle='rgba(255,230,100,0.5)';ctx.lineWidth=0.8;ctx.stroke();}
+  const wr=7, teeth=10;
+  ctx.translate(0,-16);
+  ctx.beginPath(); ctx.arc(0,0,wr,0,Math.PI*2);
+  ctx.fillStyle=goldGrad(-wr,-wr,wr,wr); ctx.shadowColor='rgba(200,140,10,0.5)'; ctx.shadowBlur=3; ctx.fill();
+  for(let i=0;i<teeth;i++){
+    const a=i/teeth*Math.PI*2;
+    const x1=wr*Math.cos(a), y1=wr*Math.sin(a);
+    const x2=(wr+3.5)*Math.cos(a+(Math.PI/teeth)*0.5), y2=(wr+3.5)*Math.sin(a+(Math.PI/teeth)*0.5);
+    const x3=(wr+3.5)*Math.cos(a-(Math.PI/teeth)*0.5), y3=(wr+3.5)*Math.sin(a-(Math.PI/teeth)*0.5);
+    const x4=wr*Math.cos(a+Math.PI/teeth), y4=wr*Math.sin(a+Math.PI/teeth);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.lineTo(x3,y3); ctx.lineTo(x4,y4);
+    ctx.fillStyle=G2; ctx.fill(); ctx.strokeStyle=G4; ctx.lineWidth=0.4; ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2);
+  ctx.fillStyle=G1; ctx.fill();
+  ctx.restore();
+}
+
+function drawChain(ctx){
+  ctx.save();
+  const sx=CROWN_X + Math.sin(TILT)*2;
+  const sy=CROWN_Y - Math.cos(TILT)*26;
+  const straight=[];
+  for(let i=0;i<8;i++){
+    straight.push({
+      x: sx + i*11 + 5,
+      y: sy - i*5,
+      rx: i%2===0 ? 7 : 5,
+      ry: i%2===0 ? 4 : 7,
+    });
+  }
+  const bx=sx+95, by=sy-38;
+  const coilCX=bx+8, coilCY=by-5;
+  const coilAngles=[0,0.7,1.4,2.1,2.8,3.5,4.2,5.0,5.8];
+  const coil=coilAngles.map((a,i)=>{
+    const cr=13-i*0.9;
+    return{x:coilCX+cr*Math.cos(a),y:coilCY+cr*Math.sin(a),rx:5.5-i*0.3,ry:3.5-i*0.2};
+  });
+  const all=[...straight,...coil];
+  all.forEach((l,i)=>{
+    if(!l||l.rx<=0||l.ry<=0)return;
+    const lg=ctx.createLinearGradient(l.x-l.rx,l.y-l.ry,l.x+l.rx,l.y+l.ry);
+    lg.addColorStop(0,G1);lg.addColorStop(0.5,G2);lg.addColorStop(1,G3);
+    ctx.save();
+    ctx.translate(l.x,l.y);
+    const ang = i<straight.length ? (i%2===0?0.2:-0.3) : (coilAngles[i-straight.length]||0)+0.4;
+    ctx.rotate(ang);
+    ctx.beginPath(); ctx.ellipse(0,0,l.rx,l.ry,0,0,Math.PI*2);
+    ctx.strokeStyle=lg; ctx.lineWidth=2.3;
+    ctx.shadowColor='rgba(200,140,10,0.5)'; ctx.shadowBlur=3;
+    ctx.stroke();
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+function draw3DShadow(ctx){
+  ctx.save(); ctx.translate(WCX+10,WCY+10);
+  const sg=ctx.createRadialGradient(0,0,R*0.3,0,0,R*1.1);
+  sg.addColorStop(0,'rgba(0,0,0,0.5)'); sg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.scale(1,0.32); ctx.beginPath(); ctx.arc(0,0,R*1.05,0,Math.PI*2);
+  ctx.fillStyle=sg; ctx.fill(); ctx.restore();
+}
+
+function drawWatch(ctx, col){
+  const [r,g,b]=hexRgb(col);
+  ctx.save(); ctx.translate(WCX,WCY); ctx.rotate(TILT);
+  const sideGrad=ctx.createLinearGradient(-R-12,-R-12,R+12,R+12);
+  sideGrad.addColorStop(0,'rgba(255,235,110,0.45)'); sideGrad.addColorStop(0.35,G2); sideGrad.addColorStop(0.65,G3); sideGrad.addColorStop(1,'rgba(15,8,0,0.85)');
+  ctx.beginPath(); ctx.arc(0,0,R+12,0,Math.PI*2);
+  ctx.fillStyle=sideGrad; ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=10; ctx.fill();
+  const rimGrad=ctx.createRadialGradient(-R*0.3,-R*0.3,R*0.1,0,0,R+5);
+  rimGrad.addColorStop(0,G1); rimGrad.addColorStop(0.5,G2); rimGrad.addColorStop(1,G3);
+  ctx.beginPath(); ctx.arc(0,0,R+6,0,Math.PI*2);
+  ctx.fillStyle=rimGrad; ctx.shadowColor='rgba(0,0,0,0)'; ctx.shadowBlur=0; ctx.fill();
+  for(let i=0;i<60;i++){const a=i/60*Math.PI*2;const isH=i%5===0,r1=R,r2=isH?R+5:R+3;ctx.beginPath();ctx.moveTo(r1*Math.cos(a),r1*Math.sin(a));ctx.lineTo(r2*Math.cos(a),r2*Math.sin(a));ctx.strokeStyle=isH?'rgba(255,230,100,0.7)':'rgba(180,130,20,0.3)';ctx.lineWidth=isH?1.2:0.5;ctx.stroke();}
+  ctx.beginPath(); ctx.arc(0,0,R+8,-Math.PI*0.85,-Math.PI*0.15);
+  ctx.strokeStyle='rgba(255,245,185,0.8)'; ctx.lineWidth=2.5; ctx.stroke();
+  const dg=ctx.createRadialGradient(-R*0.3,-R*0.35,0,0,0,R);
+  dg.addColorStop(0,'#fdf8e8'); dg.addColorStop(0.7,'#ede0b0'); dg.addColorStop(1,'#d8c870');
+  ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.fillStyle=dg; ctx.fill();
+  ctx.save(); ctx.globalAlpha=0.2;
+  for(let i=0;i<12;i++){const a=i/12*Math.PI*2-Math.PI/2;const px=(R-18)*Math.cos(a),py=(R-18)*Math.sin(a);ctx.save();ctx.translate(px,py);ctx.rotate(a+Math.PI/2);ctx.beginPath();ctx.moveTo(0,-6);ctx.bezierCurveTo(4,-3,4,3,0,6);ctx.bezierCurveTo(-4,3,-4,-3,0,-6);ctx.fillStyle=G3;ctx.fill();ctx.restore();}
+  for(let i=0;i<8;i++){const a=i/8*Math.PI*2;ctx.beginPath();ctx.moveTo(0,0);ctx.bezierCurveTo(20*Math.cos(a-0.3),20*Math.sin(a-0.3),30*Math.cos(a+0.3),30*Math.sin(a+0.3),36*Math.cos(a),36*Math.sin(a));ctx.strokeStyle=G3;ctx.lineWidth=1;ctx.stroke();ctx.beginPath();ctx.arc(36*Math.cos(a),36*Math.sin(a),2.5,0,Math.PI*2);ctx.fillStyle=G3;ctx.fill();}
+  ctx.beginPath();ctx.arc(0,0,42,0,Math.PI*2);ctx.strokeStyle=G3;ctx.lineWidth=0.7;ctx.setLineDash([2,4]);ctx.stroke();ctx.setLineDash([]);
+  ctx.restore();
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const nums=['XII','I','II','III','IV','V','VI','VII','VIII','IX','X','XI'];
+  for(let i=0;i<12;i++){const a=i/12*Math.PI*2-Math.PI/2;ctx.font='bold 11px Georgia,serif';ctx.fillStyle='rgba(15,8,0,0.92)';ctx.fillText(nums[i],(R-22)*Math.cos(a),(R-22)*Math.sin(a));}
+  for(let i=0;i<60;i++){const a=i/60*Math.PI*2-Math.PI/2;const isH=i%5===0,r1=R-(isH?14:8),r2=R-3;ctx.beginPath();ctx.moveTo(r2*Math.cos(a),r2*Math.sin(a));ctx.lineTo(r1*Math.cos(a),r1*Math.sin(a));ctx.strokeStyle=isH?'rgba(15,8,0,0.7)':'rgba(15,8,0,0.3)';ctx.lineWidth=isH?1.5:0.7;ctx.stroke();}
+  ctx.font='500 7px Rajdhani,sans-serif'; ctx.fillStyle='rgba(15,8,0,0.35)'; ctx.fillText('K — S',0,-18);
+  ctx.save(); ctx.translate(0,SCDY);
+  ctx.beginPath(); ctx.arc(0,0,SMALL_R+3,0,Math.PI*2); ctx.fillStyle='rgba(0,0,0,0.1)'; ctx.fill();
+  ctx.strokeStyle=`rgba(${r},${g},${b},0.5)`; ctx.lineWidth=0.8; ctx.stroke();
+  for(let i=0;i<12;i++){const a=i/12*Math.PI*2-Math.PI/2;ctx.beginPath();ctx.moveTo(SMALL_R*Math.cos(a),SMALL_R*Math.sin(a));ctx.lineTo((SMALL_R+2)*Math.cos(a),(SMALL_R+2)*Math.sin(a));ctx.strokeStyle=`rgba(${r},${g},${b},0.35)`;ctx.lineWidth=0.7;ctx.stroke();}
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawHands(ctx, now, col){
+  const [r,g,b]=hexRgb(col);
+  const h=now.getHours()%12,m=now.getMinutes(),s=now.getSeconds(),ms=now.getMilliseconds();
+  const ss=s+ms/1000, ms2=m+ss/60, hs=h+ms2/60;
+  const sA=ss/60*Math.PI*2-Math.PI/2;
+  ctx.save(); ctx.translate(WCX,WCY); ctx.rotate(TILT);
+  drawHandShape(ctx, hs/12*Math.PI*2, R*0.52, 6, col);
+  drawHandShape(ctx, ms2/60*Math.PI*2, R*0.76, 4, col);
+  ctx.save(); ctx.translate(0,SCDY);
+  ctx.beginPath(); ctx.moveTo(-SMALL_R*0.3*Math.cos(sA),-SMALL_R*0.3*Math.sin(sA)); ctx.lineTo(SMALL_R*0.82*Math.cos(sA),SMALL_R*0.82*Math.sin(sA));
+  ctx.strokeStyle=`rgba(${r},${g},${b},1)`; ctx.lineWidth=1.2; ctx.shadowColor=col; ctx.shadowBlur=4; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,2,0,Math.PI*2); ctx.fillStyle=`rgba(${r},${g},${b},0.9)`; ctx.fill();
+  ctx.restore();
+  const cg=ctx.createRadialGradient(-2,-2,0,0,0,6); cg.addColorStop(0,G1); cg.addColorStop(0.5,G2); cg.addColorStop(1,G3);
+  ctx.beginPath(); ctx.arc(0,0,6,0,Math.PI*2); ctx.fillStyle=cg; ctx.shadowColor='rgba(200,160,20,0.7)'; ctx.shadowBlur=6; ctx.fill();
+  ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2); ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=5; ctx.fill();
+  ctx.save(); ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.clip();
+  const sg=ctx.createRadialGradient(-R*0.45,-R*0.45,0,-R*0.2,-R*0.2,R*1.1);
+  sg.addColorStop(0,'rgba(255,255,255,0.2)'); sg.addColorStop(0.4,'rgba(255,255,255,0.04)'); sg.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=sg; ctx.fillRect(-R,-R,R*2,R*2); ctx.restore();
+  ctx.restore();
+}
+
+function drawHandShape(ctx, angle, len, width, col){
+  const [r,g,b]=hexRgb(col);
+  ctx.save(); ctx.rotate(angle);
+  ctx.beginPath(); ctx.moveTo(-width*0.4,14); ctx.lineTo(-width*0.25,-len*0.65); ctx.lineTo(0,-len); ctx.lineTo(width*0.25,-len*0.65); ctx.lineTo(width*0.4,14); ctx.lineTo(0,20); ctx.closePath();
+  ctx.fillStyle=`rgba(${r},${g},${b},0.95)`; ctx.shadowColor=col; ctx.shadowBlur=7; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(0,12); ctx.lineTo(0,-len*0.82); ctx.strokeStyle=`rgba(${r},${g},${b},0.35)`; ctx.lineWidth=0.8; ctx.stroke();
+  ctx.restore();
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  const col=getCol(), now=new Date();
+  draw3DShadow(ctx);
+  drawChain(ctx);
+  drawWindingCrown(ctx);
+  drawWatch(ctx, col);
+  drawHands(ctx, now, col);
+  document.getElementById('az-date').textContent=`${DAYS()[now.getDay()]}, ${now.getDate()}. ${MONTHS()[now.getMonth()]}`;
+}
+draw(); setInterval(draw,50);
+window.addEventListener('ks-lang-applied', draw);
+</script>
+</body>
+</html>

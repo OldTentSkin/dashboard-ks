@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Záruky Widget</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --ok: #1faa77;
+    --warn: #c8a03c;
+    --crit: #c04040;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    height: 100%;
+  }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0;
+    margin: 0;
+  }
+
+  .war-card {
+    width: 100%;
+    height: 100%;
+    border-radius: 18px;
+    padding: 18px 20px;
+    position: relative;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .war-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  /* Header */
+  .war-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  .war-label {
+    font-size: 9px; letter-spacing: 3px; color: #f0d890;
+    text-transform: uppercase; font-family: var(--sans);
+    font-weight: 600; text-shadow: 0 0 8px rgba(240,216,80,0.4);
+  }
+  .war-header-actions { display: flex; gap: 8px; align-items: center; }
+  .war-sort {
+    font-size: 11px; color: var(--gold-text); opacity: 0.75; letter-spacing: 1px;
+    background: transparent; border: 1px solid rgba(200,160,60,0.35);
+    cursor: pointer; font-family: var(--mono);
+    padding: 4px 12px; border-radius: 4px; transition: all 0.15s; outline: none;
+  }
+  .war-sort:hover, .war-sort:focus { border-color: var(--gold); color: var(--gold); }
+  .war-add-btn {
+    font-size: 11px; color: var(--gold-text); opacity: 0.75; letter-spacing: 1px;
+    background: transparent; border: 1px solid rgba(200,160,60,0.35);
+    cursor: pointer; font-family: var(--mono);
+    padding: 4px 12px; border-radius: 4px; transition: all 0.15s;
+  }
+  .war-add-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+  /* Seznam */
+  .war-list {
+    flex: 1; overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(200,160,60,0.2) transparent;
+    margin-bottom: 10px;
+  }
+
+  /* Položka záruky */
+  .war-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px 6px;
+    border-bottom: 1px solid rgba(200,160,60,0.07);
+    border-radius: 4px;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .war-item:last-child { border-bottom: none; }
+  .war-item:hover { background: rgba(200,160,60,0.04); }
+
+  /* Barevný proužek stavu */
+  .war-bar {
+    width: 3px; align-self: stretch;
+    border-radius: 2px; flex-shrink: 0; min-height: 40px;
+  }
+  .status-ok   .war-bar { background: var(--ok); box-shadow: 0 0 6px rgba(31,170,119,0.4); }
+  .status-warn .war-bar { background: var(--warn); box-shadow: 0 0 6px rgba(200,160,60,0.4); }
+  .status-crit .war-bar { background: var(--crit); box-shadow: 0 0 6px rgba(192,64,64,0.4); }
+  .status-expired .war-bar { background: rgba(100,100,100,0.5); }
+
+  .war-info { flex: 1; min-width: 0; }
+  .war-name-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; flex-wrap: wrap; }
+  .war-name {
+    font-family: var(--sans); font-size: 13px; font-weight: 700;
+    color: var(--gold-text);
+  }
+  .war-price {
+    font-size: 9px; color: var(--gold-text); letter-spacing: 1px;
+  }
+  .war-dates {
+    font-size: 9px; color: var(--gold-text); letter-spacing: 0.5px;
+    margin-bottom: 3px; line-height: 1.6;
+  }
+  .war-note {
+    font-size: 11px; font-family: var(--mono); color: var(--gold-text); font-style: italic; margin-bottom: 3px; opacity: 0.8;
+  }
+  .war-remaining {
+    font-size: 11px; font-family: var(--mono); font-weight: 600; letter-spacing: 0.5px;
+    font-family: var(--sans);
+  }
+  .status-ok   .war-remaining { color: var(--ok); }
+  .status-warn .war-remaining { color: var(--warn); }
+  .status-crit .war-remaining { color: var(--crit); }
+  .status-expired .war-remaining { color: rgba(100,100,100,0.7); }
+
+  /* Akce */
+  .war-actions {
+    display: flex; flex-direction: column; gap: 4px;
+    align-items: flex-end; flex-shrink: 0;
+  }
+  .war-doc-btn {
+    font-size: 8px; letter-spacing: 1px;
+    padding: 3px 8px; border-radius: 4px; cursor: pointer;
+    border: 1px solid rgba(200,160,60,0.2);
+    background: transparent; color: var(--gold-text); opacity: 0.7;
+    font-family: var(--mono); transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .war-doc-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .war-doc-btn.has-doc { border-color: rgba(200,160,60,0.4); color: var(--gold); }
+  .war-item-btns { display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
+  .war-item:hover .war-item-btns { opacity: 1; }
+  .war-btn {
+    background: transparent; border: none; font-size: 10px;
+    cursor: pointer; color: var(--text-dim); padding: 2px 3px;
+    border-radius: 3px; transition: color 0.15s;
+  }
+  .war-btn:hover { color: var(--gold); }
+  .war-btn.del:hover { color: #c04040; }
+
+  /* Formulář přidat/editovat */
+  .war-form {
+    display: none; flex-shrink: 0;
+    border-top: 1px solid rgba(200,160,60,0.1);
+    padding-top: 12px;
+    flex-direction: column; gap: 8px;
+  }
+  .war-form.open { display: flex; }
+  .war-form-title {
+    font-size: 9px; letter-spacing: 2px; color: var(--gold);
+    text-transform: uppercase; font-family: var(--sans);
+  }
+  .war-form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .war-input {
+    flex: 1; min-width: 120px; background: transparent;
+    border: none; border-bottom: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text); font-family: var(--mono); font-size: 10px;
+    padding: 3px 4px; outline: none; transition: border-color 0.2s;
+  }
+  .war-input:focus { border-color: var(--gold); }
+  .war-input::placeholder { color: var(--text-dim); }
+  .war-input-sm {
+    width: 80px; background: transparent;
+    border: 1px solid rgba(200,160,60,0.2); color: var(--gold-text);
+    font-family: var(--mono); font-size: 10px;
+    padding: 3px 5px; border-radius: 3px; outline: none;
+    color-scheme: dark;
+  }
+  .war-input-sm::placeholder { color: var(--text-dim); }
+  .war-select {
+    background: transparent; border: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text); font-family: var(--mono); font-size: 9px;
+    padding: 3px 5px; border-radius: 3px; cursor: pointer; outline: none;
+  }
+  .war-form-label { font-size: 8px; color: var(--text-dim); letter-spacing: 1px; white-space: nowrap; }
+  .war-form-save {
+    background: rgba(200,160,60,0.12); border: 1px solid var(--gold-dim);
+    color: var(--gold); font-family: var(--mono); font-size: 9px;
+    padding: 4px 12px; border-radius: 4px; cursor: pointer;
+    align-self: flex-end;
+  }
+  .war-form-save:hover { background: rgba(200,160,60,0.22); }
+  .war-form-cancel {
+    background: transparent; border: none; color: var(--text-dim);
+    font-family: var(--mono); font-size: 9px; cursor: pointer; padding: 4px 8px;
+  }
+
+  /* Fotka dokladu */
+  .war-doc-preview {
+    display: none; margin-top: 6px;
+    border-radius: 6px; overflow: hidden;
+    max-height: 100px;
+  }
+  .war-doc-preview.open { display: block; }
+  .war-doc-preview img { width: 100%; object-fit: contain; max-height: 100px; border-radius: 6px; }
+
+  .war-empty { font-size: 10px; color: var(--gold-text); opacity: 0.45; padding: 16px 0; text-align: center; letter-spacing: 1px; }
+</style>
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+</head>
+<body>
+
+<div class="war-card">
+  <div class="war-header">
+    <div class="war-label" data-i18n="warranty.title">Záruky</div>
+    <div class="war-header-actions">
+      <select class="war-sort" id="war-sort">
+        <option value="expiry" data-i18n="warranty.sortExpiry">↕ Expirace</option>
+        <option value="price" data-i18n="warranty.sortPrice">↕ Cena</option>
+        <option value="name" data-i18n="warranty.sortName">↕ Název</option>
+      </select>
+      <button class="war-archive-btn" id="war-archive-btn" data-i18n="warranty.archiveBtn" style="font-size:11px;color:var(--gold-text);opacity:0.75;letter-spacing:1px;background:transparent;border:1px solid rgba(200,160,60,0.35);cursor:pointer;font-family:var(--mono);padding:4px 12px;border-radius:4px;transition:all 0.15s;">📦 archiv</button>
+      <button class="war-add-btn" id="war-add-btn">+ <span data-i18n="common.add">přidat</span></button>
+    </div>
+  </div>
+
+  <div class="war-list" id="war-list"></div>
+
+  <!-- Archiv -->
+  <div id="war-archive-panel" style="display:none;flex-shrink:0;border-top:1px solid rgba(200,160,60,0.1);padding-top:10px;margin-top:6px;">
+    <div data-i18n="warranty.archiveTitle" style="font-size:9px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;font-family:var(--sans);margin-bottom:8px;">Archiv</div>
+    <div id="war-archive-list" style="max-height:120px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(200,160,60,0.2) transparent;"></div>
+  </div>
+
+  <!-- Formulář -->
+  <div class="war-form" id="war-form">
+    <div class="war-form-title" id="war-form-title">Nová záruka</div>
+    <div class="war-form-row">
+      <input class="war-input" id="wf-name" placeholder="název produktu..." data-i18n-placeholder="warranty.productNamePlaceholder">
+      <input class="war-input-sm" id="wf-price" type="number" placeholder="cena Kč" data-i18n-placeholder="warranty.priceKc">
+    </div>
+    <div class="war-form-row">
+      <span class="war-form-label" data-i18n="warranty.purchased">Koupeno:</span>
+      <input class="war-input-sm" id="wf-date" type="date">
+      <span class="war-form-label" data-i18n="warranty.warrantyLabel">Záruka:</span>
+      <select class="war-select" id="wf-months">
+        <option value="12" data-i18n="warranty.durations.m12">12 měs.</option>
+        <option value="24" selected data-i18n="warranty.durations.m24">24 měs.</option>
+        <option value="36" data-i18n="warranty.durations.m36">36 měs.</option>
+        <option value="48" data-i18n="warranty.durations.m48">48 měs.</option>
+        <option value="60" data-i18n="warranty.durations.m60">60 měs.</option>
+      </select>
+    </div>
+    <div class="war-form-row">
+      <input class="war-input" id="wf-note" placeholder="poznámka..." data-i18n-placeholder="warranty.notePlaceholder">
+    </div>
+    <div class="war-form-row">
+      <span class="war-form-label" data-i18n="warranty.photo">Doklad (foto):</span>
+      <input type="file" id="wf-photo" accept="image/*" style="font-size:9px;color:var(--text-dim);flex:1;">
+    </div>
+    <div class="war-form-row" style="justify-content:flex-end;">
+      <button class="war-form-cancel" id="war-form-cancel" data-i18n="common.cancel">zrušit</button>
+      <button class="war-form-save" id="war-form-save" data-i18n="common.save">Uložit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'ks-warranties';
+const ARCHIVE_KEY  = 'ks-warranties-archive';
+let archive = [];
+let warranties = [];
+let editingId  = null;
+
+function load() {
+  try { warranties = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { warranties = []; }
+  try { archive  = JSON.parse(localStorage.getItem(ARCHIVE_KEY)  || '[]'); } catch { archive  = []; }
+}
+function save() {
+  localStorage.setItem(STORAGE_KEY,  JSON.stringify(warranties));
+  localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archive));
+  try {
+    localStorage.setItem('ks-mob-warranty', JSON.stringify({
+      count: warranties.length,
+      statuses: warranties.map(w => calcStatus(w.purchaseDate, w.months).status),
+    }));
+  } catch {}
+}
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function calcStatus(purchaseDate, months) {
+  const bought  = new Date(purchaseDate);
+  const expires = new Date(bought);
+  expires.setMonth(expires.getMonth() + parseInt(months));
+  const today   = new Date();
+  const daysLeft = Math.ceil((expires - today) / 86400000);
+  let status = 'ok';
+  if (daysLeft <= 0)   status = 'expired';
+  else if (daysLeft <= 30)  status = 'crit';
+  else if (daysLeft <= 90)  status = 'warn';
+  return { expires, daysLeft, status };
+}
+
+function formatDate(d) {
+  const dt = new Date(d);
+  return `${dt.getDate()}. ${dt.getMonth()+1}. ${dt.getFullYear()}`;
+}
+
+function remainingText(daysLeft) {
+  if (daysLeft <= 0) return ksT('warranty.expired', 'Záruka vypršela');
+  if (daysLeft === 1) return ksT('warranty.remainingOneDay', 'Zbývá 1 den!');
+  if (daysLeft < 30)  return `${ksT('warranty.remaining','Zbývá')} ${daysLeft} ${ksT('warranty.days','dní')}!`;
+  const months = Math.floor(daysLeft / 30);
+  const days   = daysLeft % 30;
+  if (days === 0) return `${ksT('warranty.remaining','Zbývá')} ${months} ${ksT('warranty.months','měs.')}`;
+  return `${ksT('warranty.remaining','Zbývá')} ${months} ${ksT('warranty.months','měs.')} ${days} ${ksT('warranty.days','dní')}`;
+}
+
+function getSortedWarranties() {
+  const sort = document.getElementById('war-sort').value;
+  return [...warranties].sort((a,b) => {
+    if (sort === 'expiry') {
+      const ae = new Date(a.purchaseDate); ae.setMonth(ae.getMonth()+parseInt(a.months));
+      const be = new Date(b.purchaseDate); be.setMonth(be.getMonth()+parseInt(b.months));
+      return ae - be;
+    }
+    if (sort === 'price') return (b.price||0) - (a.price||0);
+    if (sort === 'name')  return a.name.localeCompare(b.name, 'cs');
+    return 0;
+  });
+}
+
+function render() {
+  const list = document.getElementById('war-list');
+  const sorted = getSortedWarranties();
+  if (!sorted.length) {
+    list.innerHTML = `<div class="war-empty">${ksT('common.empty', '// žádné záruky')}</div>`;
+    return;
+  }
+
+  list.innerHTML = sorted.map(w => {
+    const { expires, daysLeft, status } = calcStatus(w.purchaseDate, w.months);
+    return `
+    <div class="war-item status-${status}" data-id="${w.id}">
+      <div class="war-bar"></div>
+      <div class="war-info">
+        <div class="war-name-row">
+          <span class="war-name">${escHtml(w.name)}</span>
+          ${w.price ? `<span class="war-price">${parseInt(w.price).toLocaleString('cs-CZ')} ${ksT('common.kc','Kč')}</span>` : ''}
+        </div>
+        <div class="war-dates">
+          ${ksT('warranty.purchased','Koupeno:')} ${formatDate(w.purchaseDate)} · ${ksT('warranty.validUntil','Záruka do:')} ${formatDate(expires)} (${w.months} ${ksT('warranty.months','měs.')})
+        </div>
+        ${w.note ? `<div class="war-note">${escHtml(w.note)}</div>` : ''}
+        <div class="war-remaining">${remainingText(daysLeft)}</div>
+        ${w.photo ? `
+        <div class="war-doc-preview" id="doc-preview-${w.id}">
+          <img src="${w.photo}" alt="doklad">
+        </div>` : ''}
+      </div>
+      <div class="war-actions">
+        <button class="war-doc-btn ${w.photo?'has-doc':''}" data-doc="${w.id}">
+          ${w.photo ? ksT('warranty.hasDocBtn','📄 doklad') : ksT('warranty.addDocBtn','📎 foto')}
+        </button>
+        <div class="war-item-btns">
+          <button class="war-btn" data-edit="${w.id}" title="${ksT('common.edit','Editovat')}">✎</button>
+          <button class="war-btn del" data-del="${w.id}" title="${ksT('common.delete','Smazat')}">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Eventy
+  list.querySelectorAll('[data-edit]').forEach(btn => {
+    btn.addEventListener('click', () => openEdit(btn.dataset.edit));
+  });
+  list.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const toArchive = warranties.find(w => w.id === btn.dataset.del);
+      if (toArchive) { toArchive.archivedAt = new Date().toISOString().slice(0,10); archive.push(toArchive); }
+      warranties = warranties.filter(w => w.id !== btn.dataset.del);
+      save(); render();
+    });
+  });
+  list.querySelectorAll('[data-doc]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const w = warranties.find(x => x.id === btn.dataset.doc);
+      if (w?.photo) {
+        const p = document.getElementById('doc-preview-' + w.id);
+        if (p) p.classList.toggle('open');
+      } else {
+        openAdd();
+        setTimeout(() => document.getElementById('wf-name').value = w?.name || '', 50);
+      }
+    });
+  });
+}
+
+// ── FORMULÁŘ ──
+function openAdd() {
+  editingId = null;
+  document.getElementById('war-form-title').textContent = ksT('warranty.newWarranty', 'Nová záruka');
+  document.getElementById('wf-name').value = '';
+  document.getElementById('wf-price').value = '';
+  document.getElementById('wf-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('wf-months').value = '24';
+  document.getElementById('wf-note').value = '';
+  document.getElementById('wf-photo').value = '';
+  document.getElementById('war-form').classList.add('open');
+  document.getElementById('wf-name').focus();
+}
+
+function openEdit(id) {
+  const w = warranties.find(x => x.id === id);
+  if (!w) return;
+  editingId = id;
+  document.getElementById('war-form-title').textContent = ksT('warranty.editWarranty', 'Upravit záruku');
+  document.getElementById('wf-name').value = w.name;
+  document.getElementById('wf-price').value = w.price || '';
+  document.getElementById('wf-date').value = w.purchaseDate;
+  document.getElementById('wf-months').value = w.months;
+  document.getElementById('wf-note').value = w.note || '';
+  document.getElementById('war-form').classList.add('open');
+}
+
+function closeForm() {
+  document.getElementById('war-form').classList.remove('open');
+  editingId = null;
+}
+
+document.getElementById('war-add-btn').addEventListener('click', openAdd);
+document.getElementById('war-form-cancel').addEventListener('click', closeForm);
+document.getElementById('war-sort').addEventListener('change', render);
+
+document.getElementById('war-form-save').addEventListener('click', async () => {
+  const name  = document.getElementById('wf-name').value.trim();
+  if (!name) return;
+  const price = parseFloat(document.getElementById('wf-price').value) || 0;
+  const date  = document.getElementById('wf-date').value;
+  const months= document.getElementById('wf-months').value;
+  const note  = document.getElementById('wf-note').value.trim();
+  const photoFile = document.getElementById('wf-photo').files[0];
+
+  let photo = null;
+  if (photoFile) {
+    photo = await new Promise(res => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.readAsDataURL(photoFile);
+    });
+  }
+
+  if (editingId) {
+    const w = warranties.find(x => x.id === editingId);
+    if (w) {
+      w.name = name; w.price = price; w.purchaseDate = date;
+      w.months = months; w.note = note;
+      if (photo) w.photo = photo;
+    }
+  } else {
+    warranties.push({
+      id: 'w_' + Date.now(), name, price, purchaseDate: date,
+      months, note, photo
+    });
+  }
+
+  save(); closeForm(); render();
+});
+
+// ── ARCHIV ──
+document.getElementById('war-archive-btn').addEventListener('click', () => {
+  const panel = document.getElementById('war-archive-panel');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) renderArchive();
+});
+
+function renderArchive() {
+  const list = document.getElementById('war-archive-list');
+  if (!archive.length) {
+    list.innerHTML = `<div style="font-size:10px;color:var(--text-dim);padding:8px 0;letter-spacing:1px;">${ksT('warranty.archiveEmpty', '// archiv je prázdný')}</div>`;
+    return;
+  }
+  list.innerHTML = archive.map(w => `
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid rgba(200,160,60,0.06);border-radius:4px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-family:var(--sans);font-size:12px;color:rgba(200,160,60,0.5);">${escHtml(w.name)}</div>
+        <div style="font-size:8px;color:var(--text-dim);letter-spacing:1px;">
+          ${w.price ? parseInt(w.price).toLocaleString('cs-CZ') + ' ' + ksT('common.kc','Kč') + ' · ' : ''}${ksT('warranty.archivedOn','archivováno:')} ${w.archivedAt||'—'}
+        </div>
+      </div>
+
+      <button onclick="deleteFromArchive('${w.id}')" style="background:transparent;border:none;color:rgba(192,64,64,0.3);font-size:10px;cursor:pointer;padding:2px 3px;border-radius:3px;" title="${ksT('common.deletePermanent','Trvale smazat')}">✕</button>
+    </div>`).join('');
+}
+
+
+function deleteFromArchive(id) {
+  if (!confirm(ksT('warranty.confirmDelete', 'Trvale smazat? Tato akce je nevratná.'))) return;
+  archive = archive.filter(w => w.id !== id);
+  save(); renderArchive();
+}
+
+// ── INIT ──
+load(); try { localStorage.setItem('ks-mob-warranty', JSON.stringify({ count: warranties.length, statuses: warranties.map(w => calcStatus(w.purchaseDate, w.months).status) })); } catch {} render();
+
+// Když se přepne jazyk, překresli texty (seznam i případně otevřený archiv)
+window.addEventListener('ks-lang-applied', () => {
+  render();
+  if (document.getElementById('war-archive-panel').style.display !== 'none') renderArchive();
+});
+</script>
+</body>
+</html>

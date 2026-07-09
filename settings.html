@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Nastavení</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --bg: #030303;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; min-height: 100%;
+    background: var(--page-bg, var(--bg));
+    font-family: var(--mono);
+    color: var(--gold-text);
+  }
+
+  .settings-page {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 30px 20px 60px;
+  }
+
+  .settings-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .settings-title {
+    font-family: var(--sans); font-size: 22px; font-weight: 700;
+    letter-spacing: 3px; color: var(--gold); text-transform: uppercase;
+    text-shadow: 0 0 14px rgba(200,160,60,0.3);
+  }
+  .back-link {
+    font-size: 11px; letter-spacing: 1px; color: var(--text-dim);
+    text-decoration: none; border: 1px solid rgba(200,160,60,0.2);
+    padding: 6px 14px; border-radius: 6px; transition: all 0.15s;
+  }
+  .back-link:hover { color: var(--gold); border-color: var(--gold); }
+
+  .settings-section {
+    border-radius: 16px;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    padding: 22px 24px;
+    margin-bottom: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .settings-section::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 8%; right: 8%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+  .settings-section-title {
+    font-family: var(--sans); font-size: 14px; font-weight: 700;
+    letter-spacing: 2px; color: var(--gold); text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .settings-section-desc {
+    font-size: 11px; color: rgba(232,217,176,0.6);
+    letter-spacing: 0.5px; margin-bottom: 16px; line-height: 1.5;
+  }
+
+  .layout-grid {
+    width: 100%;
+    max-width: 760px;
+    aspect-ratio: 16 / 10;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 2fr;
+    grid-template-rows: 1fr 1.4fr 1fr 0.85fr;
+    gap: 8px;
+  }
+  .layout-block {
+    border-radius: 10px;
+    border: 1px solid var(--gold-dim);
+    background: rgba(0,0,0,0.35);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: var(--sans);
+    font-size: 11px; font-weight: 600; letter-spacing: 1px;
+    color: var(--gold-text);
+    cursor: grab;
+    transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
+    user-select: none;
+    position: relative;
+  }
+  .layout-block.fixed { cursor: default; opacity: 0.45; }
+  .layout-block:active { cursor: grabbing; }
+  .layout-block.dragging { opacity: 0.3; }
+  .layout-block.drag-over { box-shadow: inset 0 0 0 2px #4a9eff; }
+  .layout-block.drag-invalid { box-shadow: inset 0 0 0 2px #e05050; }
+  .embed-mini-badge {
+    position: absolute; top: -8px; right: -6px;
+    background: var(--gold); color: #1a1000;
+    font-size: 8px; font-weight: 700; letter-spacing: 1px;
+    padding: 2px 6px; border-radius: 4px;
+    transform: rotate(6deg);
+  }
+
+  .embed-add-card { margin-bottom: 16px; }
+  .embed-add-form {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    margin-top: 10px;
+  }
+  .embed-url-input, .embed-label-input {
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(200,160,60,0.3);
+    color: var(--gold-text); font-family: var(--mono); font-size: 12px;
+    padding: 8px 12px; border-radius: 6px; outline: none;
+  }
+  .embed-url-input { flex: 2; min-width: 200px; }
+  .embed-label-input { flex: 1; min-width: 140px; }
+
+  .embed-assign-hint {
+    font-size: 12px; color: var(--gold); letter-spacing: 0.5px;
+    margin-bottom: 10px; padding: 8px 12px;
+    border: 1px solid var(--gold-dim); border-radius: 8px;
+    background: rgba(200,160,60,0.08);
+  }
+
+  .embed-mini-url {
+    font-size: 8px; font-weight: 400; color: var(--text-dim);
+    margin-top: 4px; max-width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .layout-block.has-web {
+    transform: rotate(-2deg);
+    border-color: var(--gold);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  }
+  .layout-block.assignable {
+    cursor: pointer;
+  }
+  .layout-block.assignable:hover {
+    border-color: var(--gold); background: rgba(200,160,60,0.1);
+  }
+
+  .layout-actions {
+    display: flex; gap: 10px; justify-content: center;
+    margin-top: 18px; flex-wrap: wrap;
+  }
+  .settings-btn {
+    background: rgba(200,160,60,0.1); border: 1px solid var(--gold-dim);
+    color: var(--gold-text); font-family: var(--mono);
+    font-size: 11px; letter-spacing: 1px;
+    padding: 8px 20px; border-radius: 6px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .settings-btn:hover { background: rgba(200,160,60,0.2); border-color: var(--gold); }
+  .settings-btn.primary { background: rgba(200,160,60,0.2); border-color: var(--gold); color: var(--gold); }
+  .settings-btn.primary:hover { background: rgba(200,160,60,0.32); }
+  .layout-status {
+    text-align: center; font-size: 10px; color: #2ecc8f;
+    letter-spacing: 1px; margin-top: 10px; height: 14px;
+  }
+
+  .coming-soon {
+    display: flex; align-items: center; gap: 14px;
+    opacity: 0.5; pointer-events: none;
+  }
+  .coming-soon-badge {
+    font-size: 8px; letter-spacing: 1px; color: var(--text-dim);
+    border: 1px dashed rgba(200,160,60,0.3);
+    padding: 2px 8px; border-radius: 10px;
+    text-transform: uppercase; flex-shrink: 0;
+  }
+  .option-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .option-chip {
+    border: 1px solid rgba(200,160,60,0.2);
+    background: rgba(0,0,0,0.25);
+    color: var(--gold-text);
+    font-size: 11px; letter-spacing: 1px;
+    padding: 6px 14px; border-radius: 8px;
+  }
+  .option-chip.active { border-color: var(--gold); color: var(--gold); background: rgba(200,160,60,0.12); }
+
+  .theme-grid {
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .theme-tile {
+    width: 100px;
+    border: 1px solid rgba(200,160,60,0.2);
+    border-radius: 10px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.15s, transform 0.15s;
+    position: relative;
+  }
+  .theme-tile:hover { transform: translateY(-2px); }
+  .theme-tile.active { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+  .theme-tile-preview {
+    height: 56px;
+  }
+  .theme-tile-label {
+    font-size: 9px; letter-spacing: 0.5px; padding: 6px 8px;
+    color: var(--gold-text); background: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .theme-tile-lock { font-size: 10px; opacity: 0.7; }
+  .theme-status { font-size: 10px; color: #2ecc8f; letter-spacing: 1px; margin-top: 12px; height: 14px; }
+  .theme-license-info { font-size: 10.5px; color: rgba(232,217,176,0.55); letter-spacing: 0.5px; margin-top: 4px; }
+
+  .theme-buy-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .theme-buy-modal {
+    max-width: 456px; width: 100%;
+    padding: 26px;
+    border: 1px solid rgba(200,160,60,0.4); border-radius: 12px;
+    background: #0a0805;
+    box-shadow: 0 0 40px rgba(0,0,0,0.6);
+  }
+  .theme-buy-title {
+    font-family: var(--sans); font-size: 15px; font-weight: 700;
+    letter-spacing: 1px; color: var(--gold); text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .theme-buy-form { margin: 0; }
+  .theme-buy-info {
+    font-size: 12px; line-height: 1.6; color: var(--gold-text);
+    margin-bottom: 14px;
+  }
+  .theme-buy-image-wrap {
+    background: #fff; border-radius: 10px; padding: 8px;
+    margin: 0 0 14px; text-align: center;
+  }
+  .theme-buy-image-wrap img {
+    max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 4px;
+  }
+  .theme-buy-points { margin: 0 0 16px; }
+  .theme-buy-point {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(200,160,60,0.12);
+  }
+  .theme-buy-point:last-child { border-bottom: none; }
+  .theme-buy-point-num {
+    flex: 0 0 auto;
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 1px solid var(--gold-dim);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: var(--gold); font-family: var(--mono);
+    margin-top: 1px;
+  }
+  .theme-buy-point.warn .theme-buy-point-num { border-color: #e63946; color: #e63946; }
+  .theme-buy-point-title {
+    font-size: 12px; font-weight: 700; color: #2ecc8f;
+    margin-bottom: 3px;
+  }
+  .theme-buy-point.warn .theme-buy-point-title { color: #e63946; }
+  .theme-buy-point-desc {
+    font-size: 11px; line-height: 1.5; color: rgba(232,217,176,0.65);
+  }
+  .theme-buy-checkbox-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    margin-bottom: 18px; cursor: pointer;
+  }
+  .theme-buy-checkbox-row input[type="checkbox"] {
+    margin-top: 2px; width: 16px; height: 16px; accent-color: var(--gold); cursor: pointer;
+  }
+  .theme-buy-checkbox-label {
+    font-size: 12px; color: var(--gold-text); line-height: 1.4;
+  }
+  .theme-buy-actions { display: flex; gap: 10px; }
+  .theme-buy-submit {
+    flex: 1; text-align: center;
+  }
+  .theme-buy-submit:disabled {
+    opacity: 0.4; cursor: not-allowed;
+  }
+  .theme-buy-cancel {
+    background: transparent;
+  }
+
+  .unlock-code-box {
+    margin-top: 18px; padding-top: 16px;
+    border-top: 1px solid rgba(200,160,60,0.15);
+  }
+  .unlock-code-label {
+    font-size: 11px; color: rgba(232,217,176,0.6);
+    margin-bottom: 8px; letter-spacing: 0.5px;
+  }
+  .unlock-code-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .unlock-code-input {
+    flex: 1; min-width: 180px;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(200,160,60,0.3);
+    color: var(--gold-text); font-family: var(--mono); font-size: 13px;
+    padding: 9px 14px; border-radius: 8px; outline: none;
+    text-transform: uppercase;
+  }
+
+  .layout-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .layout-tab-btn {
+    background: rgba(0,0,0,0.25); border: 1px solid rgba(200,160,60,0.25);
+    color: var(--gold-text); font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+    padding: 7px 16px; border-radius: 8px; cursor: pointer; transition: all 0.15s;
+  }
+  .layout-tab-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(200,160,60,0.12); }
+  .layout-tab-btn:hover { border-color: var(--gold); }
+</style>
+<script src="widgets/theme-loader.js"></script>
+<script src="widgets/test-banner.js"></script>
+<script src="widgets/auth-lock.js"></script>
+<script src="widgets/lang-loader.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="widgets/cloud-sync.js"></script>
+</head>
+<body>
+
+<div class="settings-page">
+  <div class="settings-header">
+    <div class="settings-title" data-i18n="settings.title">Nastavení</div>
+    <a class="back-link" href="index.html">← <span data-i18n="settings.backToDashboard">Zpět na dashboard</span></a>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-section-title" data-i18n="settings.layout.title">Rozložení dashboardu</div>
+    <div class="settings-section-desc" data-i18n="settings.layout.desc">Přetáhni bloky na jiná místa v mřížce. Počasí je pevné a nelze ho přesunout. Pokud blok nelze na dané místo umístit (kolize, mimo mřížku), přetažení se vrátí zpět.</div>
+
+    <div class="layout-tabs">
+      <button class="layout-tab-btn active" id="layout-tab-desktop" data-i18n="settings.layout.tabDesktop">Počítač</button>
+      <button class="layout-tab-btn" id="layout-tab-mobile" data-i18n="settings.layout.tabMobile">Telefon</button>
+    </div>
+
+    <div id="layout-editor-desktop">
+      <div class="layout-grid" id="layout-grid"></div>
+      <div class="layout-actions">
+        <button class="settings-btn" onclick="resetLayout()" data-i18n="settings.layout.reset">Výchozí rozložení</button>
+        <button class="settings-btn primary" onclick="saveLayout()" data-i18n="settings.layout.save">Uložit rozložení</button>
+      </div>
+      <div class="layout-status" id="layout-status"></div>
+    </div>
+
+    <div id="layout-editor-mobile" style="display:none;">
+      <div class="layout-grid" id="layout-grid-mobile"></div>
+      <div class="layout-actions">
+        <button class="settings-btn" onclick="resetMobileLayout()" data-i18n="settings.layout.resetMobile">Výchozí rozložení (telefon)</button>
+        <button class="settings-btn primary" onclick="saveMobileLayout()" data-i18n="settings.layout.saveMobile">Uložit rozložení (telefon)</button>
+      </div>
+      <div class="layout-status" id="layout-status-mobile"></div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-section-title" data-i18n="settings.weatherLocation.title">Poloha počasí</div>
+    <div class="settings-section-desc" data-i18n="settings.weatherLocation.desc">Zadej název města nebo obce. Poloha se vyhledá automaticky a počasí se okamžitě přepočítá.</div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <input type="text" id="loc-input" placeholder="např. Praha, Brno, Ostrava..." data-i18n-placeholder="settings.weatherLocation.placeholder" autocomplete="off"
+        style="flex:1; min-width:180px; background:rgba(0,0,0,0.3); border:1px solid rgba(200,160,60,0.3);
+               color:var(--gold-text); font-family:var(--mono); font-size:12px; padding:9px 14px;
+               border-radius:8px; outline:none;">
+      <button class="settings-btn primary" id="loc-search-btn" data-i18n="settings.weatherLocation.searchButton">Hledat</button>
+    </div>
+    <div id="loc-results" style="margin-top:10px; display:flex; flex-direction:column; gap:6px;"></div>
+    <div id="loc-current" style="margin-top:10px; font-size:11px; color:rgba(232,217,176,0.5); letter-spacing:1px;"></div>
+    <div id="loc-status" style="height:14px; margin-top:8px; font-size:10px; color:#2ecc8f; letter-spacing:1px;"></div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-section-title" data-i18n="settings.language.title">Jazyk</div>
+    <div class="settings-section-desc" data-i18n="settings.language.desc">Vyber jazyk rozhraní dashboardu.</div>
+    <div class="option-row" id="lang-row"></div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-section-title" data-i18n="settings.announcements.title">Oznámení</div>
+    <div class="settings-section-desc" data-i18n="settings.announcements.desc">Vyber, jaké typy oznámení se mají zobrazovat jako poznámky na dashboardu (v kategorii „Vývojář").</div>
+    <div id="announce-rows"></div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-section-title" data-i18n="storage.title">Kam appka uloží tvá data?</div>
+    <div class="settings-section-desc" data-i18n="storage.subtitle">Vyber si cloudové úložiště, kam si Dashboard K-S bude ukládat tvá data.</div>
+    <div id="storage-status-row" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;"></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="settings-btn primary" id="storage-sync-btn" data-i18n="storage.syncNow" style="display:none;">Synchronizovat teď</button>
+      <button class="settings-btn" id="storage-manage-btn" data-i18n="storage.manageBtn">Připojit / změnit úložiště</button>
+      <button class="settings-btn" id="storage-disconnect-btn" data-i18n="storage.disconnect" style="display:none; color:#c04040; border-color:rgba(192,64,64,0.3);">Odpojit úložiště</button>
+    </div>
+    <div id="storage-sync-status" style="height:14px; margin-top:8px; font-size:10px; letter-spacing:1px;"></div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-section-title" data-i18n="settings.themes.title">Motivy</div>
+    <div class="settings-section-desc" data-i18n="settings.themes.desc">Vyber barevný motiv dashboardu. Změna se projeví ihned ve všech widgetech. Motivy se zámkem jsou prémiová funkce.</div>
+    <div class="theme-grid" id="theme-grid"></div>
+    <div class="theme-status" id="theme-status"></div>
+    <div class="theme-license-info" id="theme-license-info"></div>
+    <div id="theme-buy-overlay-root"></div>
+
+    <div class="unlock-code-box">
+      <div class="unlock-code-label" data-i18n="settings.themes.unlockLabel">Máš odemykací kód za koupený motiv? Zadej ho sem:</div>
+      <div class="unlock-code-row">
+        <input type="text" id="unlock-code-input" class="unlock-code-input" placeholder="XXXX-XXXX-XXXX" data-i18n-placeholder="settings.themes.unlockPlaceholder" autocomplete="off">
+        <button class="settings-btn primary" id="unlock-code-btn" data-i18n="settings.themes.unlockButton">Odemknout</button>
+      </div>
+      <div id="unlock-code-status" style="min-height:14px; margin-top:8px; font-size:10px; letter-spacing:1px; line-height:1.5;"></div>
+    </div>
+  </div>
+
+  <div class="settings-section" id="clockstyle-section" style="display:none;">
+    <div class="settings-section-title" data-i18n="settings.clockStyle.title">Styl hodin</div>
+    <div class="settings-section-desc" data-i18n="settings.clockStyle.desc">Tento motiv nabízí víc variant hodin. Vyber, která se má zobrazit.</div>
+    <div class="theme-grid" id="clockstyle-grid"></div>
+  </div>
+
+  <div class="settings-section">
+    <div class="settings-section-title">Zabezpečení</div>
+    <div class="settings-section-desc">Chraň dashboard PIN/heslem. Volitelně přidej i odemykání otiskem prstu / Face ID na podporovaných zařízeních. Nic z toho se neposílá nikam na server — vše zůstává jen v tomto prohlížeči.</div>
+
+    <div id="auth-status-off" style="display:none;">
+      <input type="password" id="auth-new-pin" placeholder="Nový PIN / heslo" autocomplete="new-password"
+        style="width:100%; max-width:280px; background:rgba(0,0,0,0.3); border:1px solid rgba(200,160,60,0.3);
+               color:var(--gold-text); font-family:var(--mono); font-size:13px; padding:9px 14px;
+               border-radius:8px; outline:none; margin-bottom:10px; display:block;">
+      <button class="settings-btn primary" id="auth-enable-btn">Zapnout zámek</button>
+    </div>
+
+    <div id="auth-status-on" style="display:none;">
+      <div style="font-size:11px; color:#2ecc8f; letter-spacing:1px; margin-bottom:12px;">✓ Zámek je zapnutý</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        <button class="settings-btn" id="auth-change-btn">Změnit PIN / heslo</button>
+        <button class="settings-btn danger" id="auth-disable-btn">Vypnout zámek</button>
+      </div>
+      <div id="fp-status-off" style="display:none;">
+        <button class="settings-btn" id="fp-register-btn">👆 Přidat odemykání otiskem</button>
+      </div>
+      <div id="fp-status-on" style="display:none;">
+        <div style="font-size:11px; color:#2ecc8f; letter-spacing:1px; margin-bottom:8px;">✓ Otisk prstu je nastavený</div>
+        <button class="settings-btn danger" id="fp-remove-btn">Odebrat otisk</button>
+      </div>
+      <div id="fp-unsupported" style="display:none; font-size:10px; color:rgba(232,217,176,0.4); margin-top:8px;">
+        Tohle zařízení/prohlížeč nepodporuje odemykání otiskem.
+      </div>
+    </div>
+
+    <div id="auth-status-msg" style="height:14px; margin-top:10px; font-size:10px; color:#2ecc8f; letter-spacing:1px;"></div>
+  </div>
+</div>
+
+<script>
+function authRenderSection() {
+  const isOn = ksAuthIsSetup();
+  document.getElementById('auth-status-off').style.display = isOn ? 'none' : 'block';
+  document.getElementById('auth-status-on').style.display = isOn ? 'block' : 'none';
+  if (isOn) {
+    const hasWebAuthn = ksAuthWebAuthnSupported();
+    const hasFp = ksAuthHasWebAuthn();
+    document.getElementById('fp-status-off').style.display = (hasWebAuthn && !hasFp) ? 'block' : 'none';
+    document.getElementById('fp-status-on').style.display = hasFp ? 'block' : 'none';
+    document.getElementById('fp-unsupported').style.display = (!hasWebAuthn && !hasFp) ? 'block' : 'none';
+  }
+}
+function authMsg(text, isErr) {
+  const el = document.getElementById('auth-status-msg');
+  el.style.color = isErr ? '#d34a4a' : '#2ecc8f';
+  el.textContent = text;
+  setTimeout(() => { el.textContent = ''; }, 3000);
+}
+document.getElementById('auth-enable-btn').addEventListener('click', async () => {
+  const val = document.getElementById('auth-new-pin').value.trim();
+  if (val.length < 4) { authMsg('PIN/heslo musí mít alespoň 4 znaky.', true); return; }
+  await ksAuthSetupPassword(val);
+  ksAuthMarkUnlocked();
+  document.getElementById('auth-new-pin').value = '';
+  authMsg('✓ Zámek zapnutý.');
+  authRenderSection();
+});
+document.getElementById('auth-disable-btn').addEventListener('click', () => {
+  if (!confirm('Opravdu vypnout zámek appky?')) return;
+  ksAuthDisable();
+  authMsg('Zámek vypnutý.');
+  authRenderSection();
+});
+document.getElementById('auth-change-btn').addEventListener('click', async () => {
+  const val = prompt('Zadej nový PIN / heslo:');
+  if (!val || val.trim().length < 4) { if (val !== null) authMsg('PIN/heslo musí mít alespoň 4 znaky.', true); return; }
+  await ksAuthSetupPassword(val.trim());
+  authMsg('✓ PIN/heslo změněno.');
+});
+document.getElementById('fp-register-btn').addEventListener('click', async () => {
+  try {
+    await ksAuthRegisterWebAuthn();
+    authMsg('✓ Otisk nastaven.');
+    authRenderSection();
+  } catch (e) {
+    authMsg('Nepodařilo se nastavit otisk (' + e.message + ').', true);
+  }
+});
+document.getElementById('fp-remove-btn').addEventListener('click', () => {
+  ksAuthRemoveWebAuthn();
+  authMsg('Otisk odebrán.');
+  authRenderSection();
+});
+authRenderSection();
+</script>
+
+<script>
+const LAYOUT_KEY = 'ks-layout';
+
+const DEFAULT_LAYOUT = {
+  weather:  { col: 1, row: 1, colSpan: 1, rowSpan: 2, fixed: true,  label: 'Počasí' },
+  clock:    { col: 2, row: 1, colSpan: 1, rowSpan: 1, fixed: false, label: 'Hodiny' },
+  agenda:   { col: 3, row: 1, colSpan: 1, rowSpan: 1, fixed: false, label: 'Agenda' },
+  cal:      { col: 4, row: 1, colSpan: 1, rowSpan: 3, fixed: false, label: 'Kalendář' },
+  todo:     { col: 2, row: 2, colSpan: 2, rowSpan: 1, fixed: false, label: 'To-Do' },
+  rss:      { col: 1, row: 3, colSpan: 1, rowSpan: 1, fixed: false, label: 'RSS' },
+  youtube:  { col: 2, row: 3, colSpan: 1, rowSpan: 1, fixed: false, label: 'YouTube' },
+  notes:    { col: 3, row: 3, colSpan: 1, rowSpan: 1, fixed: false, label: 'Poznámky' },
+  diary:    { col: 2, row: 4, colSpan: 2, rowSpan: 1, fixed: false, label: 'Deník' },
+  warranty: { col: 1, row: 4, colSpan: 1, rowSpan: 1, fixed: false, label: 'Záruky' },
+  shopping: { col: 4, row: 4, colSpan: 1, rowSpan: 1, fixed: false, label: 'Nákupy' },
+};
+
+let editorLayout = {};
+
+const KS_CUSTOM_FLIPS_KEY = 'ks-custom-flips';
+let embedAssignMode = false;
+let embedPendingWeb = null;
+
+function getCustomFlips() {
+  try { return JSON.parse(localStorage.getItem(KS_CUSTOM_FLIPS_KEY) || '{}'); } catch { return {}; }
+}
+function setCustomFlips(data) {
+  try { localStorage.setItem(KS_CUSTOM_FLIPS_KEY, JSON.stringify(data)); } catch {}
+}
+
+function handleEmbedBlockClick(id) {
+  if (id === 'weather') {
+    if (embedAssignMode) alert(ksT('embed.notAssignable', 'K téhle dlaždici nejde vlastní stránku přiřadit'));
+    return;
+  }
+  const customFlips = getCustomFlips();
+
+  if (embedAssignMode && embedPendingWeb) {
+    customFlips[id] = embedPendingWeb;
+    setCustomFlips(customFlips);
+    embedAssignMode = false;
+    embedPendingWeb = null;
+    document.getElementById('embed-assign-hint').style.display = 'none';
+    renderLayoutGrid();
+    return;
+  }
+
+  if (customFlips[id]) {
+    if (confirm(ksT('embed.confirmRemoveWeb', 'Opravdu odebrat vloženou stránku z téhle dlaždice?'))) {
+      delete customFlips[id];
+      setCustomFlips(customFlips);
+      renderLayoutGrid();
+    }
+  }
+}
+
+KS_LANG_READY.then(renderLayoutGrid);
+
+const LAYOUT_LABEL_KEYS = {
+  weather: 'weather.title', clock: 'clock.title', agenda: 'agenda.title',
+  cal: 'calendar.title', todo: 'todo.title', rss: 'rss.title',
+  youtube: 'youtube.title', notes: 'notes.title', diary: 'diary.title',
+  warranty: 'warranty.title', shopping: 'shopping.title',
+};
+
+function loadLayout() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) || 'null');
+    return saved || JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+  } catch { return JSON.parse(JSON.stringify(DEFAULT_LAYOUT)); }
+}
+
+function cellsOf(b) {
+  const cells = [];
+  for (let c = b.col; c < b.col + b.colSpan; c++) {
+    for (let r = b.row; r < b.row + b.rowSpan; r++) {
+      cells.push(c + ',' + r);
+    }
+  }
+  return cells;
+}
+
+function canPlace(layout, id, col, row) {
+  const moved = { ...layout[id], col, row };
+  if (col < 1 || row < 1 || col + moved.colSpan - 1 > 4 || row + moved.rowSpan - 1 > 4) return false;
+  const movedCells = new Set(cellsOf(moved));
+  for (const [otherId, b] of Object.entries(layout)) {
+    if (otherId === id) continue;
+    const otherCells = cellsOf(b);
+    if (otherCells.some(c => movedCells.has(c))) return false;
+  }
+  return true;
+}
+
+function renderLayoutGrid() {
+  const grid = document.getElementById('layout-grid');
+  grid.innerHTML = '';
+  const customFlips = getCustomFlips();
+  Object.entries(editorLayout).forEach(([id, b]) => {
+    const el = document.createElement('div');
+    const web = customFlips[id];
+    let cls = 'layout-block' + (b.fixed ? ' fixed' : '');
+    if (web) cls += ' has-web';
+    else if (embedAssignMode && !b.fixed) cls += ' assignable';
+    el.className = cls;
+    const label = ksT(LAYOUT_LABEL_KEYS[id], b.label);
+    el.innerHTML = web
+      ? `<span class="embed-mini-badge">${ksT('embed.flipBadge','FLIP')}</span><span>${label}</span><span class="embed-mini-url">${web.label || web.url}</span>`
+      : `<span>${label}</span>`;
+    el.dataset.id = id;
+    el.style.gridColumn = b.colSpan > 1 ? `${b.col} / span ${b.colSpan}` : `${b.col}`;
+    el.style.gridRow = b.rowSpan > 1 ? `${b.row} / span ${b.rowSpan}` : `${b.row}`;
+    if (!b.fixed) {
+      el.draggable = true;
+      el.addEventListener('dragstart', onBlockDragStart);
+      el.addEventListener('dragend', onBlockDragEnd);
+      el.addEventListener('dragover', onBlockDragOver);
+      el.addEventListener('dragleave', onBlockDragLeave);
+      el.addEventListener('drop', onBlockDrop);
+    }
+    el.addEventListener('click', () => handleEmbedBlockClick(id));
+    grid.appendChild(el);
+  });
+}
+
+let draggedId = null;
+
+function onBlockDragStart(e) {
+  draggedId = e.currentTarget.dataset.id;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onBlockDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.layout-block').forEach(el => el.classList.remove('drag-over','drag-invalid'));
+}
+function onBlockDragOver(e) {
+  e.preventDefault();
+  const targetId = e.currentTarget.dataset.id;
+  if (!draggedId || targetId === draggedId) return;
+  const valid = canPlaceSwap(draggedId, targetId);
+  e.currentTarget.classList.toggle('drag-over', valid);
+  e.currentTarget.classList.toggle('drag-invalid', !valid);
+}
+function onBlockDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over','drag-invalid');
+}
+function canPlaceSwap(fromId, toId) {
+  const toPos = editorLayout[toId];
+  if (!toPos || toPos.fixed) return false;
+  const testLayout = { ...editorLayout };
+  delete testLayout[toId];
+  return canPlace(testLayout, fromId, toPos.col, toPos.row);
+}
+function onBlockDrop(e) {
+  e.preventDefault();
+  const targetId = e.currentTarget.dataset.id;
+  e.currentTarget.classList.remove('drag-over','drag-invalid');
+  if (!draggedId || targetId === draggedId) return;
+  if (editorLayout[targetId].fixed) return;
+
+  const fromPos = { ...editorLayout[draggedId] };
+  const toPos = { ...editorLayout[targetId] };
+
+  const testLayout = { ...editorLayout };
+  testLayout[draggedId] = { ...editorLayout[draggedId], col: toPos.col, row: toPos.row };
+  testLayout[targetId] = { ...editorLayout[targetId], col: fromPos.col, row: fromPos.row };
+
+  if (canPlace(testLayout, draggedId, toPos.col, toPos.row) && canPlace(testLayout, targetId, fromPos.col, fromPos.row)) {
+    editorLayout[draggedId].col = toPos.col;
+    editorLayout[draggedId].row = toPos.row;
+    editorLayout[targetId].col = fromPos.col;
+    editorLayout[targetId].row = fromPos.row;
+    renderLayoutGrid();
+  }
+  draggedId = null;
+}
+
+function saveLayout() {
+  localStorage.setItem(LAYOUT_KEY, JSON.stringify(editorLayout));
+  const status = document.getElementById('layout-status');
+  status.textContent = `✓ ${ksT('settings.layout.saved')}`;
+  setTimeout(() => { status.textContent = ''; }, 2200);
+}
+
+function resetLayout() {
+  editorLayout = JSON.parse(JSON.stringify(DEFAULT_LAYOUT));
+  renderLayoutGrid();
+}
+
+editorLayout = JSON.parse(JSON.stringify(loadLayout()));
+renderLayoutGrid();
+
+// ── MOBILNÍ ROZLOŽENÍ (samostatná záložka) ──
+const LAYOUT_MOBILE_KEY = 'ks-layout-mobile';
+
+const MOBILE_DEFAULT_LAYOUT = {
+  weather:  { col: 1, row: 1, colSpan: 1, rowSpan: 2, fixed: true,  label: 'Počasí' },
+  clock:    { col: 2, row: 1, colSpan: 2, rowSpan: 1, fixed: false, label: 'Hodiny' },
+  cal:      { col: 4, row: 1, colSpan: 1, rowSpan: 2, fixed: false, label: 'Kalendář' },
+  todo:     { col: 2, row: 2, colSpan: 2, rowSpan: 1, fixed: false, label: 'To-Do' },
+  notes:    { col: 1, row: 3, colSpan: 1, rowSpan: 1, fixed: false, label: 'Poznámky' },
+  youtube:  { col: 2, row: 3, colSpan: 1, rowSpan: 1, fixed: false, label: 'YouTube' },
+  rss:      { col: 3, row: 3, colSpan: 1, rowSpan: 1, fixed: false, label: 'RSS' },
+  agenda:   { col: 4, row: 3, colSpan: 1, rowSpan: 1, fixed: false, label: 'Agenda' },
+  warranty: { col: 1, row: 4, colSpan: 1, rowSpan: 1, fixed: false, label: 'Záruky' },
+  diary:    { col: 2, row: 4, colSpan: 2, rowSpan: 1, fixed: false, label: 'Deník' },
+  shopping: { col: 4, row: 4, colSpan: 1, rowSpan: 1, fixed: false, label: 'Nákupy' },
+};
+
+let editorMobileLayout = {};
+let draggedMobileId = null;
+
+function loadMobileLayout() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAYOUT_MOBILE_KEY) || 'null');
+    return saved || JSON.parse(JSON.stringify(MOBILE_DEFAULT_LAYOUT));
+  } catch { return JSON.parse(JSON.stringify(MOBILE_DEFAULT_LAYOUT)); }
+}
+
+function renderMobileLayoutGrid() {
+  const grid = document.getElementById('layout-grid-mobile');
+  if (!grid) return;
+  grid.innerHTML = '';
+  Object.entries(editorMobileLayout).forEach(([id, b]) => {
+    const el = document.createElement('div');
+    el.className = 'layout-block' + (b.fixed ? ' fixed' : '');
+    const label = ksT(LAYOUT_LABEL_KEYS[id], b.label);
+    el.innerHTML = `<span>${label}</span>`;
+    el.dataset.id = id;
+    el.style.gridColumn = b.colSpan > 1 ? `${b.col} / span ${b.colSpan}` : `${b.col}`;
+    el.style.gridRow = b.rowSpan > 1 ? `${b.row} / span ${b.rowSpan}` : `${b.row}`;
+    if (!b.fixed) {
+      el.draggable = true;
+      el.addEventListener('dragstart', onMobileBlockDragStart);
+      el.addEventListener('dragend', onMobileBlockDragEnd);
+      el.addEventListener('dragover', onMobileBlockDragOver);
+      el.addEventListener('dragleave', onMobileBlockDragLeave);
+      el.addEventListener('drop', onMobileBlockDrop);
+    }
+    grid.appendChild(el);
+  });
+}
+
+function onMobileBlockDragStart(e) {
+  draggedMobileId = e.currentTarget.dataset.id;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onMobileBlockDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('#layout-grid-mobile .layout-block').forEach(el => el.classList.remove('drag-over','drag-invalid'));
+}
+function onMobileBlockDragOver(e) {
+  e.preventDefault();
+  const targetId = e.currentTarget.dataset.id;
+  if (!draggedMobileId || targetId === draggedMobileId) return;
+  const valid = canPlaceMobileSwap(draggedMobileId, targetId);
+  e.currentTarget.classList.toggle('drag-over', valid);
+  e.currentTarget.classList.toggle('drag-invalid', !valid);
+}
+function onMobileBlockDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over','drag-invalid');
+}
+function canPlaceMobileSwap(fromId, toId) {
+  const toPos = editorMobileLayout[toId];
+  if (!toPos || toPos.fixed) return false;
+  const testLayout = { ...editorMobileLayout };
+  delete testLayout[toId];
+  return canPlace(testLayout, fromId, toPos.col, toPos.row);
+}
+function onMobileBlockDrop(e) {
+  e.preventDefault();
+  const targetId = e.currentTarget.dataset.id;
+  e.currentTarget.classList.remove('drag-over','drag-invalid');
+  if (!draggedMobileId || targetId === draggedMobileId) return;
+  if (editorMobileLayout[targetId].fixed) return;
+
+  const fromPos = { ...editorMobileLayout[draggedMobileId] };
+  const toPos = { ...editorMobileLayout[targetId] };
+
+  const testLayout = { ...editorMobileLayout };
+  testLayout[draggedMobileId] = { ...editorMobileLayout[draggedMobileId], col: toPos.col, row: toPos.row };
+  testLayout[targetId] = { ...editorMobileLayout[targetId], col: fromPos.col, row: fromPos.row };
+
+  if (canPlace(testLayout, draggedMobileId, toPos.col, toPos.row) && canPlace(testLayout, targetId, fromPos.col, fromPos.row)) {
+    editorMobileLayout[draggedMobileId].col = toPos.col;
+    editorMobileLayout[draggedMobileId].row = toPos.row;
+    editorMobileLayout[targetId].col = fromPos.col;
+    editorMobileLayout[targetId].row = fromPos.row;
+    renderMobileLayoutGrid();
+  }
+  draggedMobileId = null;
+}
+
+function saveMobileLayout() {
+  localStorage.setItem(LAYOUT_MOBILE_KEY, JSON.stringify(editorMobileLayout));
+  const status = document.getElementById('layout-status-mobile');
+  status.textContent = `✓ ${ksT('settings.layout.savedMobile', 'Uloženo')}`;
+  setTimeout(() => { status.textContent = ''; }, 2200);
+}
+
+function resetMobileLayout() {
+  editorMobileLayout = JSON.parse(JSON.stringify(MOBILE_DEFAULT_LAYOUT));
+  renderMobileLayoutGrid();
+}
+
+editorMobileLayout = loadMobileLayout();
+renderMobileLayoutGrid();
+
+// Přepínání záložek Počítač / Telefon
+document.getElementById('layout-tab-desktop').addEventListener('click', () => {
+  document.getElementById('layout-tab-desktop').classList.add('active');
+  document.getElementById('layout-tab-mobile').classList.remove('active');
+  document.getElementById('layout-editor-desktop').style.display = '';
+  document.getElementById('layout-editor-mobile').style.display = 'none';
+});
+document.getElementById('layout-tab-mobile').addEventListener('click', () => {
+  document.getElementById('layout-tab-mobile').classList.add('active');
+  document.getElementById('layout-tab-desktop').classList.remove('active');
+  document.getElementById('layout-editor-mobile').style.display = '';
+  document.getElementById('layout-editor-desktop').style.display = 'none';
+});
+
+function renderStorageSection() {
+  const statusRow = document.getElementById('storage-status-row');
+  const syncBtn = document.getElementById('storage-sync-btn');
+  const disconnectBtn = document.getElementById('storage-disconnect-btn');
+  const provider = ksGetStorageProvider();
+
+  if (provider === 'gdrive' && ksIsCloudConnected()) {
+    statusRow.innerHTML = `<span style="color:#2ecc8f;font-size:12px;">${ksT('storage.connected','✓ Připojeno')} — Google Drive</span>`;
+    syncBtn.style.display = 'inline-block';
+    disconnectBtn.style.display = 'inline-block';
+  } else if (provider === 'local') {
+    statusRow.innerHTML = `<span style="color:var(--gold);font-size:12px;">${ksT('storage.providers.local.name','Jen v tomto prohlížeči')}</span>`;
+    syncBtn.style.display = 'none';
+    disconnectBtn.style.display = 'none';
+  } else {
+    statusRow.innerHTML = `<span style="color:var(--text-dim);font-size:12px;">—</span>`;
+    syncBtn.style.display = 'none';
+    disconnectBtn.style.display = 'none';
+  }
+}
+
+document.getElementById('storage-manage-btn').addEventListener('click', () => {
+  window.location.href = 'onboarding.html';
+});
+document.getElementById('storage-sync-btn').addEventListener('click', () => {
+  const status = document.getElementById('storage-sync-status');
+  status.style.color = 'rgba(200,160,60,0.6)';
+  status.textContent = ksT('storage.syncing', '// synchronizuji...');
+  ksSyncNow((ok) => {
+    status.style.color = ok ? '#2ecc8f' : '#c04040';
+    status.textContent = ok ? ksT('storage.syncDone','✓ Synchronizováno') : ksT('storage.syncError','// chyba synchronizace');
+    setTimeout(() => { status.textContent = ''; }, 2500);
+  });
+});
+document.getElementById('storage-disconnect-btn').addEventListener('click', () => {
+  if (!confirm(ksT('storage.confirmDisconnect', 'Opravdu odpojit úložiště? Appka přestane ukládat data do cloudu (v prohlížeči zůstanou zachována).'))) return;
+  ksDisconnectStorage();
+  renderStorageSection();
+});
+KS_LANG_READY.then(renderStorageSection);
+
+const KS_ANNOUNCE_PREFS_KEY = 'ks-announce-prefs';
+function getAnnouncePrefs() {
+  try {
+    const raw = localStorage.getItem(KS_ANNOUNCE_PREFS_KEY);
+    if (raw) return { update: true, sale: false, ...JSON.parse(raw) };
+  } catch {}
+  return { update: true, sale: false };
+}
+function setAnnouncePref(type, value) {
+  const prefs = getAnnouncePrefs();
+  prefs[type] = value;
+  try { localStorage.setItem(KS_ANNOUNCE_PREFS_KEY, JSON.stringify(prefs)); } catch {}
+}
+function renderAnnounceRows() {
+  const wrap = document.getElementById('announce-rows');
+  const prefs = getAnnouncePrefs();
+  const types = [
+    { id: 'update', label: ksT('settings.announcements.update', 'Aktualizace') },
+    { id: 'sale',   label: ksT('settings.announcements.sale', 'Slevy') },
+  ];
+  wrap.innerHTML = types.map(t => `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <span style="font-family:var(--sans); font-size:13px; color:var(--gold-text);">${t.label}</span>
+      <div class="option-row" style="margin:0;" data-announce-type="${t.id}">
+        <div class="option-chip ${prefs[t.id] ? 'active' : ''}" data-val="on">${ksT('settings.announcements.on','Zapnuto')}</div>
+        <div class="option-chip ${!prefs[t.id] ? 'active' : ''}" data-val="off">${ksT('settings.announcements.off','Vypnuto')}</div>
+      </div>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('[data-announce-type]').forEach(row => {
+    const type = row.dataset.announceType;
+    row.querySelectorAll('.option-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        setAnnouncePref(type, chip.dataset.val === 'on');
+        renderAnnounceRows();
+      });
+    });
+  });
+}
+KS_LANG_READY.then(renderAnnounceRows);
+
+function renderLangRow() {
+  const row = document.getElementById('lang-row');
+  const pref = ksGetLangPref();
+  const options = [{ id: 'auto', label: ksT('settings.language.auto', 'Auto (podle zařízení)') }]
+    .concat(KS_SUPPORTED.map(id => ({ id, label: KS_LANG_LABELS[id] })));
+  row.innerHTML = options.map(o =>
+    `<div class="option-chip ${o.id === pref ? 'active' : ''}" data-lang="${o.id}">${o.label}</div>`
+  ).join('');
+  row.querySelectorAll('[data-lang]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      ksSetLangPref(chip.dataset.lang);
+      renderLangRow();
+    });
+  });
+}
+window.addEventListener('ks-lang-applied', () => {
+  renderLangRow();
+  renderAnnounceRows();
+  renderStorageSection();
+  renderThemeGrid();
+  renderClockStyleSection();
+  locShowCurrent();
+  renderLayoutGrid();
+  renderMobileLayoutGrid();
+});
+KS_LANG_READY.then(renderLangRow);
+
+// ── MOTIVY ──
+const UNLOCKED_KEY = 'ks-theme-unlocked';
+const LICENSE_CODE_KEY = 'ks-theme-license-codes';
+
+// Appka si pamatuje jen SAMOTNÝ KÓD u každého odemčeného motivu (ne číslo použití) —
+// aktuální počet zbývajících použití se pak vždy zjišťuje živě dotazem na server
+// (mode: "status"), ať je zobrazená hodnota vždy skutečně aktuální a ověřená.
+function getSavedLicenseCodes() {
+  try { return JSON.parse(localStorage.getItem(LICENSE_CODE_KEY) || '{}'); } catch { return {}; }
+}
+function saveLicenseCode(themeId, code) {
+  const codes = getSavedLicenseCodes();
+  codes[themeId] = code;
+  localStorage.setItem(LICENSE_CODE_KEY, JSON.stringify(codes));
+}
+
+async function refreshThemeLicenseDisplay() {
+  const licenseInfoEl = document.getElementById('theme-license-info');
+  if (!licenseInfoEl) return;
+  const current = ksGetTheme();
+  const currentTheme = KS_THEMES[current];
+  const savedCode = getSavedLicenseCodes()[current];
+
+  if (!currentTheme || !currentTheme.premium || !savedCode) {
+    licenseInfoEl.textContent = '';
+    return;
+  }
+
+  licenseInfoEl.textContent = ksT('settings.themes.unlockChecking', '// ověřuji kód...');
+  try {
+    const res = await fetch('check-code.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: savedCode, mode: 'status' })
+    });
+    const data = await res.json();
+    if (data.valid && typeof data.remaining === 'number' && typeof data.max === 'number') {
+      const tpl = ksT('settings.themes.unlockRemaining', 'Zbývá {remaining} z {max} použití.');
+      licenseInfoEl.textContent = `${currentTheme.label}: ${tpl.replace('{remaining}', data.remaining).replace('{max}', data.max)}`;
+    } else {
+      licenseInfoEl.textContent = '';
+    }
+  } catch {
+    licenseInfoEl.textContent = '';
+  }
+}
+
+// PayPal hosted_button_id pro každý placený motiv (49 Kč, viz theme-paypal-ipn.php)
+const PAYPAL_BUTTON_IDS = {
+  matrix:  'GP6RH2U682UEY',
+  neon:    'SHMQ87CYD79G8',
+  crimson: 'RZCW8J2JBSJSU',
+  solar:   'Q7UVWJARFD6X2',
+  azure:   '87JBKP5TVCV2L',
+  azur:    '87JBKP5TVCV2L',
+};
+
+function isDevMode() {
+  return new URLSearchParams(window.location.search).get('dev') === '1';
+}
+
+// Motivy odemčené zadaným kódem (uložené jen v tomto prohlížeči, žádná osobní data)
+function getCodeUnlockedThemes() {
+  try { return JSON.parse(localStorage.getItem(UNLOCKED_KEY) || '[]'); } catch { return []; }
+}
+function addCodeUnlockedTheme(themeId) {
+  const list = getCodeUnlockedThemes();
+  if (!list.includes(themeId)) {
+    list.push(themeId);
+    localStorage.setItem(UNLOCKED_KEY, JSON.stringify(list));
+  }
+}
+
+function getUnlocked() {
+  if (isDevMode()) return Object.keys(KS_THEMES);
+  const free = Object.entries(KS_THEMES).filter(([id, t]) => !t.premium).map(([id]) => id);
+  const codeUnlocked = getCodeUnlockedThemes();
+  return [...new Set([...free, ...codeUnlocked])];
+}
+
+function renderThemeGrid() {
+  const grid = document.getElementById('theme-grid');
+  const current = ksGetTheme();
+  const unlocked = getUnlocked();
+  grid.innerHTML = Object.entries(KS_THEMES).map(([id, t]) => {
+    const isLocked = t.premium && !unlocked.includes(id);
+    return `<div class="theme-tile ${id===current?'active':''}" data-theme="${id}" data-locked="${isLocked}">
+      <div class="theme-tile-preview" style="background:${t.cardBg};"></div>
+      <div class="theme-tile-label">
+        <span>${t.label}</span>
+        ${isLocked ? '<span class="theme-tile-lock">🔒</span>' : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  refreshThemeLicenseDisplay();
+
+  grid.querySelectorAll('.theme-tile').forEach(tile => {
+    tile.addEventListener('click', () => {
+      const id = tile.dataset.theme;
+      const locked = tile.dataset.locked === 'true';
+      const status = document.getElementById('theme-status');
+
+      if (locked) {
+        status.textContent = '';
+        openThemeBuyModal(id);
+        return;
+      }
+
+      closeThemeBuyModal();
+      ksSetTheme(id);
+      renderThemeGrid();
+      renderClockStyleSection();
+      status.style.color = '#2ecc8f';
+      status.textContent = `✓ ${ksT('settings.themes.applied')}`;
+      setTimeout(() => { status.textContent = ''; }, 2200);
+    });
+  });
+}
+renderThemeGrid();
+
+// ── POP-UP PŘED KOUPÍ MOTIVU ──
+function closeThemeBuyModal() {
+  const root = document.getElementById('theme-buy-overlay-root');
+  root.innerHTML = '';
+}
+
+function openThemeBuyModal(id) {
+  const t = KS_THEMES[id];
+  const buttonId = PAYPAL_BUTTON_IDS[id];
+  const root = document.getElementById('theme-buy-overlay-root');
+  if (!buttonId) { root.innerHTML = ''; return; }
+
+  root.innerHTML = `
+    <div class="theme-buy-overlay" id="theme-buy-overlay">
+      <div class="theme-buy-modal">
+        <div class="theme-buy-title">🔒 ${t.label} — ${ksT('settings.themes.premiumTheme')}, 49 Kč</div>
+        <div class="theme-buy-image-wrap">
+          <img src="varovani.png" alt="">
+        </div>
+        <div class="theme-buy-points">
+          <div class="theme-buy-point">
+            <div>
+              <div class="theme-buy-point-title">${ksT('settings.themes.buyModalPoint1Title')}</div>
+              <div class="theme-buy-point-desc">${ksT('settings.themes.buyModalPoint1Desc')}</div>
+            </div>
+          </div>
+          <div class="theme-buy-point warn">
+            <div>
+              <div class="theme-buy-point-title">${ksT('settings.themes.buyModalPoint2Title')}</div>
+              <div class="theme-buy-point-desc">${ksT('settings.themes.buyModalPoint2Desc')}</div>
+            </div>
+          </div>
+          <div class="theme-buy-point warn">
+            <div>
+              <div class="theme-buy-point-title">${ksT('settings.themes.buyModalPoint3Title')}</div>
+              <div class="theme-buy-point-desc">${ksT('settings.themes.buyModalPoint3Desc')}</div>
+            </div>
+          </div>
+        </div>
+        <label class="theme-buy-checkbox-row">
+          <input type="checkbox" id="theme-buy-confirm-checkbox">
+          <span class="theme-buy-checkbox-label">${ksT('settings.themes.buyModalCheckbox')}</span>
+        </label>
+        <div class="theme-buy-actions">
+          <button type="button" class="settings-btn theme-buy-cancel" id="theme-buy-cancel-btn">${ksT('settings.themes.buyModalCancel')}</button>
+          <form action="https://www.paypal.com/donate" method="post" target="_blank" class="theme-buy-form" style="flex:1;">
+            <input type="hidden" name="hosted_button_id" value="${buttonId}" />
+            <button type="submit" class="settings-btn primary theme-buy-submit" id="theme-buy-submit-btn" disabled>${ksT('settings.themes.buyModalContinue')}</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const checkbox = document.getElementById('theme-buy-confirm-checkbox');
+  const submitBtn = document.getElementById('theme-buy-submit-btn');
+  checkbox.addEventListener('change', () => { submitBtn.disabled = !checkbox.checked; });
+
+  document.getElementById('theme-buy-cancel-btn').addEventListener('click', closeThemeBuyModal);
+  document.getElementById('theme-buy-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'theme-buy-overlay') closeThemeBuyModal();
+  });
+}
+
+// ── ZADÁNÍ ODEMYKACÍHO KÓDU ──
+
+// Trvalé ID tohoto prohlížeče (v anonymním/inkognito režimu se po zavření ztratí —
+// to je normální chování prohlížeče, ne chyba appky). Díky němu server pozná, že
+// stejný prohlížeč zadává stejný kód znovu, a nepočítá to jako další nové zařízení.
+const DEVICE_ID_KEY = 'ks-device-id';
+function getDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = (window.crypto && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : 'dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+
+async function submitUnlockCode() {
+  const input = document.getElementById('unlock-code-input');
+  const status = document.getElementById('unlock-code-status');
+  const code = input.value.trim().toUpperCase();
+  if (!code) return;
+
+  status.style.color = 'rgba(200,160,60,0.6)';
+  status.textContent = ksT('settings.themes.unlockChecking', '// ověřuji kód...');
+
+  try {
+    const res = await fetch('check-code.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, deviceId: getDeviceId() })
+    });
+    const data = await res.json();
+
+    if (data.valid) {
+      addCodeUnlockedTheme(data.theme);
+      saveLicenseCode(data.theme, code);
+      status.style.color = '#2ecc8f';
+      status.textContent = ksT('settings.themes.unlockSuccess', '✓ Motiv odemčen!');
+      input.value = '';
+      renderThemeGrid();
+    } else if (data.reason === 'exhausted') {
+      status.style.color = '#d34a4a';
+      status.textContent = ksT('settings.themes.unlockExhausted', '// kód byl už použit maximální počet krát (5×)');
+    } else {
+      status.style.color = '#d34a4a';
+      status.textContent = ksT('settings.themes.unlockInvalid', '// neplatný kód, zkontroluj prosím zadání');
+    }
+  } catch {
+    status.style.color = '#d34a4a';
+    status.textContent = ksT('settings.themes.unlockError', '// chyba připojení, zkus to znovu');
+  }
+  setTimeout(() => { status.textContent = ''; }, 4500);
+}
+document.getElementById('unlock-code-btn').addEventListener('click', submitUnlockCode);
+document.getElementById('unlock-code-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitUnlockCode();
+});
+
+// ── STYL HODIN ──
+const CLOCK_STYLES_KEY = 'ks-clock-style';
+const CLOCK_OPTIONS = {
+  gold:    [{ id: 'flip',      label: 'Flip hodiny',          file: 'clock-flip-full.html' }],
+  matrix:  [{ id: 'flip',      label: 'Flip hodiny (zelené)', file: 'clock-flip-full.html' },
+            { id: 'matrix',    label: 'Matrix rain',          file: 'matrix-clock-widget.html' }],
+  neon:    [{ id: 'flip',      label: 'Flip hodiny (fialové)', file: 'clock-flip-full.html' },
+            { id: 'multi',     label: 'Neon (více barev)',    file: 'neon-clock-widget.html' }],
+  crimson: [{ id: 'flip',      label: 'Flip hodiny (červené)', file: 'clock-flip-full.html' },
+            { id: 'hourglass', label: 'Přesýpací hodiny',     file: 'crimson-clock-widget.html' }],
+  solar:   [{ id: 'flip',      label: 'Flip hodiny (oranžové)', file: 'clock-flip-full.html' },
+            { id: 'sundial',   label: 'Sluneční hodiny',       file: 'solar-clock-widget.html' }],
+  azure:   [{ id: 'flip',      label: 'Flip hodiny (azurové)', file: 'clock-flip-full.html' },
+            { id: 'pocket',    label: 'Kapesní hodiny',        file: 'azure-clock-widget.html' }],
+};
+
+function getClockStyles() {
+  try { return JSON.parse(localStorage.getItem(CLOCK_STYLES_KEY) || '{}'); } catch { return {}; }
+}
+function setClockStyle(themeId, styleId) {
+  const all = getClockStyles();
+  all[themeId] = styleId;
+  localStorage.setItem(CLOCK_STYLES_KEY, JSON.stringify(all));
+}
+
+function renderClockStyleSection() {
+  const section = document.getElementById('clockstyle-section');
+  const grid = document.getElementById('clockstyle-grid');
+  const current = ksGetTheme();
+  const options = CLOCK_OPTIONS[current] || [];
+
+  if (options.length < 1) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const saved = getClockStyles();
+  const activeStyle = saved[current] || options[0].id;
+
+  grid.innerHTML = options.map(o => `
+    <div class="theme-tile ${o.id===activeStyle?'active':''}" data-style="${o.id}" style="width:140px;">
+      <div class="theme-tile-preview" style="background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:22px;">🕐</div>
+      <div class="theme-tile-label"><span>${ksT('settings.clockStyle.styles.' + current + '_' + o.id, o.label)}</span></div>
+    </div>
+  `).join('');
+
+  grid.querySelectorAll('.theme-tile').forEach(tile => {
+    tile.addEventListener('click', () => {
+      setClockStyle(current, tile.dataset.style);
+      renderClockStyleSection();
+    });
+  });
+}
+renderClockStyleSection();
+
+function locShowCurrent() {
+  const raw = localStorage.getItem('ks-weather-loc');
+  const el = document.getElementById('loc-current');
+  if (!el) return;
+  if (raw) {
+    const loc = JSON.parse(raw);
+    el.textContent = `${ksT('settings.weatherLocation.current', 'Aktuální poloha:')} ${loc.name} (${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)})`;
+  } else {
+    el.textContent = `${ksT('settings.weatherLocation.current', 'Aktuální poloha:')} ${ksT('settings.weatherLocation.defaultLocation', 'Jenštejn (výchozí)')}`;
+  }
+}
+locShowCurrent();
+
+document.getElementById('loc-search-btn').addEventListener('click', locSearch);
+document.getElementById('loc-input').addEventListener('keydown', e => { if (e.key === 'Enter') locSearch(); });
+
+async function locSearch() {
+  const q = document.getElementById('loc-input').value.trim();
+  if (!q) return;
+  const status = document.getElementById('loc-status');
+  const results = document.getElementById('loc-results');
+  status.style.color = 'rgba(200,160,60,0.6)';
+  status.textContent = ksT('settings.weatherLocation.searching');
+  results.innerHTML = '';
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`, {
+      headers: { 'Accept-Language': 'cs,en' }
+    });
+    const data = await res.json();
+    if (!data.length) { status.style.color = '#c04040'; status.textContent = ksT('settings.weatherLocation.notFound'); return; }
+    status.textContent = '';
+    results.innerHTML = data.map((r, i) => `
+      <div data-i="${i}" style="padding:8px 12px; border:1px solid rgba(200,160,60,0.2); border-radius:8px;
+           cursor:pointer; font-size:11px; color:var(--gold-text); font-family:var(--mono);
+           transition:border-color 0.15s;">
+        ${r.display_name}
+      </div>
+    `).join('');
+    results.querySelectorAll('[data-i]').forEach(el => {
+      el.addEventListener('mouseover', () => el.style.borderColor = 'var(--gold)');
+      el.addEventListener('mouseout',  () => el.style.borderColor = 'rgba(200,160,60,0.2)');
+      el.addEventListener('click', () => {
+        const r = data[parseInt(el.dataset.i)];
+        const loc = { lat: parseFloat(r.lat), lon: parseFloat(r.lon), name: r.display_name.split(',')[0].trim() };
+        localStorage.setItem('ks-weather-loc', JSON.stringify(loc));
+        results.innerHTML = '';
+        document.getElementById('loc-input').value = '';
+        const s = document.getElementById('loc-status');
+        s.style.color = '#2ecc8f';
+        s.textContent = `${ksT('settings.weatherLocation.saved')} ${loc.name}`;
+        setTimeout(() => { s.textContent = ''; }, 2500);
+        locShowCurrent();
+      });
+    });
+  } catch {
+    status.style.color = '#c04040';
+    status.textContent = ksT('settings.weatherLocation.searchError');
+  }
+}
+</script>
+</body>
+</html>

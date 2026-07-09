@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — RSS Widget</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    height: 100%;
+  }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0;
+    margin: 0;
+  }
+
+  .rss-card {
+    width: 100%;
+    height: 100%;
+    border-radius: 18px;
+    padding: 18px 20px;
+    position: relative;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .rss-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  /* Header */
+  .rss-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  .rss-label {
+    font-size: 9px; letter-spacing: 3px; color: #f0d890;
+    text-transform: uppercase; font-family: var(--sans);
+    font-weight: 600; text-shadow: 0 0 8px rgba(240,216,80,0.4);
+  }
+  .rss-status { font-size: 9px; color: var(--text-dim); letter-spacing: 1px; }
+
+  /* Zdroje — horizontální scroll */
+  .rss-sources {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    margin-bottom: 12px;
+    padding-bottom: 4px;
+    flex-shrink: 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(200,160,60,0.2) transparent;
+  }
+  .rss-source-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(200,160,60,0.25);
+    background: transparent;
+    color: var(--gold-text);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .rss-source-chip:hover { border-color: var(--gold-dim); color: var(--gold); }
+  .rss-source-chip.active { background: rgba(200,160,60,0.12); border-color: var(--gold); color: var(--gold); }
+  .rss-source-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .rss-source-del {
+    background: transparent; border: none; color: rgba(200,160,60,0.3);
+    font-size: 11px; cursor: pointer; padding: 0 0 0 2px; line-height: 1;
+    transition: color 0.15s;
+  }
+  .rss-source-del:hover { color: #c04040; }
+
+  /* Články */
+  .rss-list {
+    flex: 1;
+    min-height: 50px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(200,160,60,0.2) transparent;
+    margin-bottom: 10px;
+  }
+
+  .rss-item {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(200,160,60,0.07);
+    cursor: pointer;
+    transition: background 0.15s;
+    border-radius: 4px;
+  }
+  .rss-item:last-child { border-bottom: none; }
+  .rss-item:hover { background: rgba(200,160,60,0.04); }
+
+  .rss-item-source {
+    font-size: 11px; letter-spacing: 0.5px; color: var(--text-dim);
+    text-transform: uppercase; margin-bottom: 2px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .rss-item-flag { font-size: 10px; }
+  .rss-item-title {
+    font-size: 11px; color: var(--gold-text);
+    line-height: 1.4; margin-bottom: 2px;
+  }
+  .rss-item:hover .rss-item-title { color: var(--gold); }
+  .rss-item-date { font-size: 10px; color: var(--text-dim); letter-spacing: 0.5px; flex-shrink: 0; }
+
+  .rss-loading { font-size: 10px; color: var(--text-dim); padding: 20px 0; text-align: center; letter-spacing: 2px; }
+  .rss-error   { font-size: 10px; color: #c04040; padding: 12px 0; letter-spacing: 1px; }
+
+  /* Správa zdrojů */
+  .rss-manage {
+    flex-shrink: 0;
+    border-top: 1px solid rgba(200,160,60,0.1);
+    padding-top: 10px;
+  }
+  .rss-manage-toggle {
+    font-size: 11px; letter-spacing: 0.5px; color: var(--text-dim);
+    background: transparent; border: none; cursor: pointer;
+    text-transform: uppercase; display: flex; align-items: center; gap: 4px;
+    margin-bottom: 0;
+  }
+  .rss-manage-toggle:hover { color: var(--gold); }
+
+  .rss-manage-form { display: none; margin-top: 8px; flex-direction: column; gap: 6px; flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(200,160,60,0.2) transparent; }
+  .rss-manage-form.open { display: flex; }
+  .rss-card.managing .rss-sources,
+  .rss-card.managing .rss-list-actions,
+  .rss-card.managing .rss-list { display: none; }
+  .rss-card.managing .rss-manage { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+  /* Kategorie výběr */
+  .rss-cat-tabs {
+    display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 4px;
+  }
+  .rss-cat-tab {
+    font-size: 10px; padding: 3px 8px; border-radius: 8px;
+    border: 1px solid rgba(200,160,60,0.15);
+    background: transparent; color: var(--text-dim);
+    cursor: pointer; font-family: var(--mono);
+    transition: all 0.15s; letter-spacing: 1px;
+  }
+  .rss-cat-tab:hover { border-color: var(--gold-dim); color: var(--gold-text); }
+  .rss-cat-tab.active { background: rgba(200,160,60,0.12); border-color: var(--gold); color: var(--gold); }
+
+  .rss-preset-list {
+    display: none; flex-direction: column; gap: 3px; max-height: 120px;
+    overflow-y: auto; scrollbar-width: thin;
+  }
+  .rss-preset-list.open { display: flex; }
+  .rss-preset-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--gold-text); padding: 3px 4px;
+    border-radius: 3px; cursor: pointer;
+    transition: background 0.12s;
+  }
+  .rss-preset-item:hover { background: rgba(200,160,60,0.06); color: var(--gold-text); }
+  .rss-preset-item input[type=checkbox] { accent-color: var(--gold); flex-shrink: 0; }
+
+  .rss-add-row { display: flex; gap: 6px; align-items: center; }
+  .rss-add-url {
+    flex: 1; background: transparent;
+    border: none; border-bottom: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text); font-family: var(--mono); font-size: 9px;
+    padding: 3px 4px; outline: none; transition: border-color 0.2s;
+  }
+  .rss-add-url:focus { border-color: var(--gold); }
+  .rss-add-url::placeholder { color: var(--text-dim); }
+  .rss-add-name {
+    width: 90px; background: transparent;
+    border: none; border-bottom: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text); font-family: var(--mono); font-size: 9px;
+    padding: 3px 4px; outline: none;
+  }
+  .rss-add-name::placeholder { color: var(--text-dim); }
+  .rss-add-btn {
+    background: rgba(200,160,60,0.12); border: 1px solid var(--gold-dim);
+    color: var(--gold); font-family: var(--mono); font-size: 11px;
+    padding: 2px 10px; border-radius: 4px; cursor: pointer;
+  }
+  /* Lišta akcí nad seznamem */
+  .rss-list-actions {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px; flex-shrink: 0;
+  }
+  .rss-select-all {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 10px; color: var(--gold-text); opacity: 0.75; letter-spacing: 1px;
+    cursor: pointer; user-select: none; text-transform: uppercase;
+  }
+  .rss-select-all input[type=checkbox] { accent-color: var(--gold); cursor: pointer; }
+  .rss-action-btn {
+    font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+    background: transparent; border: 1px solid rgba(200,160,60,0.35);
+    color: var(--gold-text); opacity: 0.75; font-family: var(--mono);
+    padding: 3px 8px; border-radius: 5px; cursor: pointer;
+    transition: all 0.15s; margin-left: auto;
+  }
+  .rss-action-btn:hover { border-color: var(--gold-dim); color: var(--gold-text); }
+  .rss-action-btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+  .rss-action-btn.del:hover { border-color: #c04040; color: #c04040; }
+  .rss-action-count {
+    font-size: 10px; color: var(--gold); letter-spacing: 1px;
+  }
+
+  /* Checkbox v poznámce */
+  .rss-item { display: flex; align-items: flex-start; gap: 8px; }
+  .rss-item-check {
+    margin-top: 3px; accent-color: var(--gold); cursor: pointer; flex-shrink: 0;
+  }
+  .rss-item-body { flex: 1; min-width: 0; }
+
+  .rss-source-chip.folder { border-color: rgba(200,160,60,0.3); }
+  .rss-source-chip.folder.active { border-color: var(--gold); }  .rss-card.managing .rss-preset-list { max-height: none; flex: 1; }
+</style>
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+</head>
+<body>
+
+<div class="rss-card">
+  <div class="rss-header">
+    <div class="rss-label" data-i18n="rss.headerTitle">RSS · Novinky</div>
+    <div class="rss-status" id="rss-status">—</div>
+  </div>
+
+  <div class="rss-sources" id="rss-sources"></div>
+  <div class="rss-list-actions">
+    <label class="rss-select-all">
+      <input type="checkbox" id="rss-select-all"> <span data-i18n="rss.markAllRead">Označit vše</span>
+    </label>
+    <span class="rss-action-count" id="rss-action-count"></span>
+    <button class="rss-action-btn" id="rss-later-btn" disabled>📁 <span data-i18n="rss.later">Později</span></button>
+    <button class="rss-action-btn del" id="rss-del-btn" disabled>✕ <span data-i18n="common.delete">Smazat</span></button>
+  </div>
+  <div class="rss-list" id="rss-list"><div class="rss-loading" data-i18n="common.loading">// načítám...</div></div>
+
+  <div class="rss-manage">
+    <button class="rss-manage-toggle" id="rss-manage-toggle">
+      <span id="rss-manage-arrow">▸</span> <span data-i18n="rss.sourceManagement">Správa zdrojů</span>
+    </button>
+    <div class="rss-manage-form" id="rss-manage-form">
+      <div class="rss-cat-tabs" id="rss-cat-tabs"></div>
+      <div class="rss-preset-list" id="rss-preset-list"></div>
+      <div class="rss-add-row">
+        <input class="rss-add-url" id="rss-add-url" placeholder="vlastní RSS URL..." data-i18n-placeholder="rss.customUrlPlaceholder">
+        <input class="rss-add-name" id="rss-add-name" placeholder="název" data-i18n-placeholder="rss.namePlaceholder">
+        <button class="rss-add-btn" id="rss-add-btn">+</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PROXY = 'https://kulhavysup.cz/dashboard/ks-proxy.php?url=';
+const STORAGE_KEY = 'ks-rss-feeds';
+
+// ── PŘEDNASTAVENÉ ZDROJE ──
+const PRESETS = {
+  'technology': [
+    { name: 'Root.cz',      url: 'https://www.root.cz/rss/clanky/',         flag: '🇨🇿', color: '#33b679' },
+    { name: 'Lupa.cz',      url: 'https://www.lupa.cz/rss/clanky/',         flag: '🇨🇿', color: '#039be5' },
+    { name: 'PCTuning',     url: 'https://pctuning.tyden.cz/rss-clanky.xml',flag: '🇨🇿', color: '#f4511e' },
+    { name: 'Hackernews',   url: 'https://hnrss.org/frontpage',             flag: '🇬🇧', color: '#f4511e' },
+    { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index', flag: '🇬🇧', color: '#8e24aa' },
+    { name: 'Wired',        url: 'https://www.wired.com/feed/rss',          flag: '🇬🇧', color: '#33b679' },
+  ],
+  'ai': [
+    { name: 'Anthropic',    url: 'https://www.anthropic.com/rss.xml',       flag: '🇬🇧', color: '#c8a03c' },
+    { name: 'VibeCoding',   url: 'https://www.vibecoding.cz/vibecoding-feed.xml', flag: '🇨🇿', color: '#039be5' },
+    { name: 'OpenAI Blog',  url: 'https://openai.com/blog/rss.xml',         flag: '🇬🇧', color: '#10b981' },
+    { name: 'MIT AI',       url: 'https://news.mit.edu/topic/artificial-intelligence2/feed', flag: '🇬🇧', color: '#8e24aa' },
+    { name: 'Hugging Face', url: 'https://huggingface.co/blog/feed.xml',     flag: '🇬🇧', color: '#f4511e' },
+  ],
+  'science': [
+    { name: 'Science Daily',url: 'https://www.sciencedaily.com/rss/all.xml',flag: '🇬🇧', color: '#33b679' },
+    { name: 'Nature',       url: 'https://www.nature.com/nature.rss',       flag: '🇬🇧', color: '#039be5' },
+    { name: 'NASA',         url: 'https://www.nasa.gov/rss/dyn/breaking_news.rss', flag: '🇬🇧', color: '#1565c0' },
+  ],
+  'sport': [
+    { name: 'iDnes Sport',  url: 'https://servis.idnes.cz/rss.aspx?c=sport', flag: '🇨🇿', color: '#e53935' },
+    { name: 'BBC Sport',    url: 'https://feeds.bbci.co.uk/sport/rss.xml',  flag: '🇬🇧', color: '#c62828' },
+    { name: 'ESPN',         url: 'https://www.espn.com/espn/rss/news',      flag: '🇬🇧', color: '#f4511e' },
+  ],
+  'news': [
+    { name: 'iDnes.cz',     url: 'https://servis.idnes.cz/rss.aspx?c=zpravodaj', flag: '🇨🇿', color: '#e53935' },
+    { name: 'BBC News',     url: 'https://feeds.bbci.co.uk/news/rss.xml',   flag: '🇬🇧', color: '#c62828' },
+    { name: 'Reuters',      url: 'https://feeds.reuters.com/reuters/topNews',flag: '🇬🇧', color: '#f57c00' },
+    { name: 'Spite.cz',     url: 'https://spite.cz/feed',                  flag: '🇨🇿', color: '#8e24aa' },
+  ],
+  'entertainment': [
+    { name: 'Kinobox',      url: 'https://www.kinobox.cz/rss',              flag: '🇨🇿', color: '#f6bf26' },
+    { name: 'IGN',          url: 'https://feeds.ign.com/ign/all',           flag: '🇬🇧', color: '#e53935' },
+  ],
+  'finance': [
+    { name: 'E15.cz',       url: 'https://www.e15.cz/rss',                  flag: '🇨🇿', color: '#33b679' },
+    { name: 'Forbes',       url: 'https://www.forbes.com/innovation/feed2', flag: '🇬🇧', color: '#039be5' },
+    { name: 'CoinDesk',     url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', flag: '🇬🇧', color: '#f6bf26' },
+  ],
+  'gaming': [
+    { name: 'Doupě.cz',     url: 'https://doupe.zive.cz/rss/clanky',        flag: '🇨🇿', color: '#8e24aa' },
+    { name: 'IGN Gaming',   url: 'https://feeds.ign.com/ign/games',         flag: '🇬🇧', color: '#e53935' },
+    { name: 'Eurogamer',    url: 'https://www.eurogamer.net/?format=rss',   flag: '🇬🇧', color: '#33b679' },
+    { name: 'Rock Paper Shotgun', url: 'https://www.rockpapershotgun.com/feed', flag: '🇬🇧', color: '#f4511e' },
+  ],
+};
+
+// ── STORAGE ──
+let feeds = [];
+let activeSource = null; // null = vše, číslo = index feedu, 'readlater' = složka
+let allArticles = [];
+let dismissed = [];
+let readLater = [];
+let selected = new Set();
+
+function loadDismissed() {
+  try { dismissed = JSON.parse(localStorage.getItem('ks-rss-dismissed') || '[]'); } catch { dismissed = []; }
+}
+function saveDismissed() { localStorage.setItem('ks-rss-dismissed', JSON.stringify(dismissed)); }
+function loadReadLater() {
+  try { readLater = JSON.parse(localStorage.getItem('ks-rss-readlater') || '[]'); } catch { readLater = []; }
+}
+function saveReadLater() { localStorage.setItem('ks-rss-readlater', JSON.stringify(readLater)); }
+
+function loadFeeds() {
+  try { feeds = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { feeds = []; }
+  if (!feeds.length) {
+    // Výchozí zdroje při prvním spuštění
+    feeds = [
+      { name: 'Lupa.cz',   url: 'https://www.lupa.cz/rss/clanky/',         flag: '🇨🇿', color: '#039be5' },
+      { name: 'Anthropic', url: 'https://www.anthropic.com/rss.xml',        flag: '🇬🇧', color: '#c8a03c' },
+      { name: 'Root.cz',   url: 'https://www.root.cz/rss/clanky/',          flag: '🇨🇿', color: '#33b679' },
+    ];
+    saveFeeds();
+  }
+}
+function saveFeeds() { localStorage.setItem(STORAGE_KEY, JSON.stringify(feeds)); }
+
+// ── RENDER ZDROJŮ ──
+function renderSources() {
+  const wrap = document.getElementById('rss-sources');
+  let html = `<div class="rss-source-chip ${activeSource===null?'active':''}" data-src="all">
+    <div class="rss-source-dot" style="background:var(--gold);"></div>${ksT('common.all','Vše')}
+  </div>`;
+  html += `<div class="rss-source-chip folder ${activeSource==='readlater'?'active':''}" data-src="readlater">
+    📁 ${ksT('rss.later','Později')}<span style="color:var(--gold);">${readLater.length}</span>
+  </div>`;
+  feeds.forEach((f, i) => {
+    html += `<div class="rss-source-chip ${activeSource===i?'active':''}" data-src="${i}">
+      <span>${f.flag||''}</span>
+      <div class="rss-source-dot" style="background:${f.color};"></div>
+      ${f.name}
+      <button class="rss-source-del" data-del="${i}" title="${ksT('rss.removeSource','Odebrat')}">✕</button>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('[data-src]').forEach(chip => {
+    chip.addEventListener('click', e => {
+      if (e.target.closest('[data-del]')) return;
+      const src = chip.dataset.src;
+      activeSource = src === 'all' ? null : (src === 'readlater' ? 'readlater' : parseInt(src));
+      selected.clear();
+      renderSources();
+      renderArticles();
+    });
+  });
+  wrap.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      feeds.splice(parseInt(btn.dataset.del), 1);
+      if (typeof activeSource === 'number' && activeSource >= feeds.length) activeSource = null;
+      saveFeeds(); renderSources(); loadAllFeeds();
+    });
+  });
+}
+
+// ── NAČTENÍ RSS ──
+async function fetchFeed(feed) {
+  try {
+    const res  = await fetch(PROXY + encodeURIComponent(feed.url));
+    const data = await res.json();
+    if (!data.ok) return [];
+    return data.articles.map(a => ({ ...a, source: feed.name, flag: feed.flag||'', color: feed.color }));
+  } catch { return []; }
+}
+
+async function loadAllFeeds() {
+  document.getElementById('rss-list').innerHTML = `<div class="rss-loading">${ksT('common.loading','// načítám...')}</div>`;
+  document.getElementById('rss-status').textContent = '...';
+
+  const results = await Promise.all(feeds.map(f => fetchFeed(f)));
+  allArticles = results.flat().filter(a => !dismissed.includes(a.url)).sort((a,b) => b.timestamp - a.timestamp);
+
+  document.getElementById('rss-status').textContent = `${allArticles.length} ${ksT('rss.articlesCount','článků')}`;
+  try { localStorage.setItem('ks-mob-rss', JSON.stringify({ count: allArticles.length, colors: allArticles.slice(0,8).map(a => a.color) })); } catch {}
+  renderArticles();
+}
+
+function getVisibleArticles() {
+  if (activeSource === 'readlater') return readLater;
+  if (activeSource !== null) return allArticles.filter(a => a.source === feeds[activeSource]?.name);
+  return allArticles;
+}
+
+function renderArticles() {
+  const list = document.getElementById('rss-list');
+  const articles = getVisibleArticles();
+  if (!articles.length) {
+    list.innerHTML = `<div class="rss-loading">${ksT('rss.noArticles', '// žádné články')}</div>`;
+    updateActionsBar();
+    return;
+  }
+  list.innerHTML = articles.map(a => `
+    <div class="rss-item">
+      <input type="checkbox" class="rss-item-check" data-id="${escAttr(a.url)}" ${selected.has(a.url)?'checked':''}>
+      <div class="rss-item-body" onclick="window.open('${a.url}','_blank','noopener')">
+        <div class="rss-item-source" style="color:${a.color||'var(--text-dim)'};">
+          <span class="rss-item-flag">${a.flag}</span>
+          ${a.source}
+          <span style="margin-left:auto;color:var(--text-dim);">${a.date}</span>
+        </div>
+        <div class="rss-item-title">${escHtml(a.title)}</div>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.rss-item-check').forEach(cb => {
+    cb.addEventListener('click', e => e.stopPropagation());
+    cb.addEventListener('change', () => {
+      if (cb.checked) selected.add(cb.dataset.id); else selected.delete(cb.dataset.id);
+      updateActionsBar();
+    });
+  });
+
+  updateActionsBar();
+}
+
+function escAttr(s) { return String(s).replace(/"/g,'&quot;'); }
+
+// ── LIŠTA AKCÍ (označit vše / později / smazat) ──
+function updateActionsBar() {
+  const articles = getVisibleArticles();
+  const visibleIds = articles.map(a => a.url);
+  const selCount = visibleIds.filter(id => selected.has(id)).length;
+
+  const allCb = document.getElementById('rss-select-all');
+  allCb.checked = visibleIds.length > 0 && selCount === visibleIds.length;
+
+  document.getElementById('rss-action-count').textContent = selCount > 0 ? `${selCount} ${ksT('rss.selectedCount','vybráno')}` : '';
+  document.getElementById('rss-later-btn').disabled = selCount === 0 || activeSource === 'readlater';
+  document.getElementById('rss-del-btn').disabled = selCount === 0;
+}
+
+document.getElementById('rss-select-all').addEventListener('change', e => {
+  const articles = getVisibleArticles();
+  if (e.target.checked) articles.forEach(a => selected.add(a.url));
+  else articles.forEach(a => selected.delete(a.url));
+  renderArticles();
+});
+
+document.getElementById('rss-later-btn').addEventListener('click', () => {
+  const articles = getVisibleArticles();
+  articles.filter(a => selected.has(a.url)).forEach(a => {
+    if (!readLater.some(r => r.url === a.url)) readLater.push(a);
+  });
+  saveReadLater();
+  selected.clear();
+  renderSources();
+  renderArticles();
+});
+
+document.getElementById('rss-del-btn').addEventListener('click', () => {
+  if (activeSource === 'readlater') {
+    readLater = readLater.filter(a => !selected.has(a.url));
+    saveReadLater();
+  } else {
+    dismissed.push(...selected);
+    saveDismissed();
+    allArticles = allArticles.filter(a => !selected.has(a.url));
+  }
+  selected.clear();
+  renderSources();
+  renderArticles();
+});
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── SPRÁVA ZDROJŮ ──
+document.getElementById('rss-manage-toggle').addEventListener('click', () => {
+  const form  = document.getElementById('rss-manage-form');
+  const arrow = document.getElementById('rss-manage-arrow');
+  const card  = document.querySelector('.rss-card');
+  form.classList.toggle('open');
+  card.classList.toggle('managing', form.classList.contains('open'));
+  arrow.textContent = form.classList.contains('open') ? '▾' : '▸';
+  if (form.classList.contains('open')) renderCatTabs();
+});
+
+let activeCat = null;
+function renderCatTabs() {
+  const tabs = document.getElementById('rss-cat-tabs');
+  tabs.innerHTML = Object.keys(PRESETS).map(cat =>
+    `<button class="rss-cat-tab ${activeCat===cat?'active':''}" data-cat="${cat}">${ksT('rss.categories.'+cat, cat)}</button>`
+  ).join('');
+  tabs.querySelectorAll('[data-cat]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeCat = activeCat === btn.dataset.cat ? null : btn.dataset.cat;
+      renderCatTabs();
+      renderPresets();
+    });
+  });
+}
+
+function renderPresets() {
+  const list = document.getElementById('rss-preset-list');
+  if (!activeCat) { list.classList.remove('open'); return; }
+  list.classList.add('open');
+  const presets = PRESETS[activeCat] || [];
+  list.innerHTML = presets.map(p => {
+    const exists = feeds.some(f => f.url === p.url);
+    return `<label class="rss-preset-item">
+      <input type="checkbox" ${exists?'checked':''} data-preset-url="${p.url}" style="accent-color:${p.color};">
+      <span>${p.flag}</span>
+      <div style="width:6px;height:6px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>
+      ${p.name}
+    </label>`;
+  }).join('');
+  list.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const preset = presets.find(p => p.url === cb.dataset.presetUrl);
+      if (!preset) return;
+      if (cb.checked) {
+        if (!feeds.some(f => f.url === preset.url)) { feeds.push(preset); saveFeeds(); renderSources(); loadAllFeeds(); }
+      } else {
+        feeds = feeds.filter(f => f.url !== preset.url);
+        saveFeeds(); renderSources(); loadAllFeeds();
+      }
+    });
+  });
+}
+
+// Přidat vlastní
+document.getElementById('rss-add-btn').addEventListener('click', addCustomFeed);
+document.getElementById('rss-add-url').addEventListener('keydown', e => { if(e.key==='Enter') addCustomFeed(); });
+function addCustomFeed() {
+  const url  = document.getElementById('rss-add-url').value.trim();
+  const name = document.getElementById('rss-add-name').value.trim() || new URL(url).hostname;
+  if (!url) return;
+  if (feeds.some(f => f.url === url)) { document.getElementById('rss-add-url').value=''; return; }
+  const colors = ['#039be5','#33b679','#8e24aa','#e53935','#f4511e','#f6bf26','#c8a03c'];
+  feeds.push({ name, url, flag: '🌐', color: colors[feeds.length % colors.length] });
+  document.getElementById('rss-add-url').value = '';
+  document.getElementById('rss-add-name').value = '';
+  saveFeeds(); renderSources(); loadAllFeeds();
+}
+
+// ── INIT ──
+loadDismissed();
+loadReadLater();
+loadFeeds();
+renderSources();
+loadAllFeeds();
+
+// Když se přepne jazyk, překresli texty (zdroje, seznam, případně otevřenou správu zdrojů)
+window.addEventListener('ks-lang-applied', () => {
+  renderSources();
+  renderArticles();
+  if (document.getElementById('rss-manage-form').classList.contains('open')) {
+    renderCatTabs();
+    renderPresets();
+  }
+});
+</script>
+</body>
+</html>

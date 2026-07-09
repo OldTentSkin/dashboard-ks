@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Nákupy Widget</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a03c;
+    --gold-dim: rgba(200,160,60,0.3);
+    --gold-text: #e8d9b0;
+    --text-dim: #6b5f3f;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+    --p-hned: #e03020;
+    --p-pockat: #4a7a4a;
+    --sleva: #1faa77;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    height: 100%;
+  }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0;
+    margin: 0;
+  }
+
+  .shop-card {
+    width: 100%;
+    height: 100%;
+    border-radius: 18px;
+    padding: 18px 20px;
+    position: relative;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c89820 0%, #6a4a00 30%, #1a1000 60%, #000000 100%));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .shop-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+
+  /* Header */
+  .shop-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  .shop-label {
+    font-size: 9px; letter-spacing: 3px; color: #f0d890;
+    text-transform: uppercase; font-family: var(--sans);
+    font-weight: 600; text-shadow: 0 0 8px rgba(240,216,80,0.4);
+  }
+  .shop-total {
+    font-size: 9px; color: var(--text-dim); letter-spacing: 1px;
+  }
+
+  /* Kategorie slider */
+  .cat-slider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+  }
+  .cat-arrow {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(200,160,60,0.25);
+    color: rgba(200,160,60,0.6);
+    width: 24px; height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .cat-arrow:hover { border-color: var(--gold); color: var(--gold); }
+  .cat-arrow:disabled { opacity: 0.2; cursor: default; }
+  .cat-current {
+    flex: 1;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--gold);
+    border-radius: 8px;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .cat-name {
+    font-family: var(--sans); font-size: 13px; font-weight: 700;
+    color: #fff; letter-spacing: 1px;
+  }
+  .cat-count {
+    background: var(--gold); color: #000;
+    font-size: 10px; font-weight: 700;
+    padding: 1px 7px; border-radius: 8px;
+    font-family: var(--sans);
+  }
+  .cat-del-btn {
+    background: transparent; border: none;
+    color: rgba(192,64,64,0.4); font-size: 11px;
+    cursor: pointer; padding: 0 2px; transition: color 0.15s;
+    margin-left: 6px;
+  }
+  .cat-del-btn:hover { color: #c04040; }
+  .cat-dots {
+    display: flex; justify-content: center; gap: 5px;
+    margin-bottom: 10px; flex-shrink: 0;
+  }
+  .cat-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: rgba(200,160,60,0.2); transition: all 0.2s;
+  }
+  .cat-dot.active { background: var(--gold); width: 14px; border-radius: 3px; }
+
+  /* Nová kategorie */
+  .cat-new-row {
+    display: none; align-items: center; gap: 6px;
+    margin-bottom: 8px; flex-shrink: 0;
+  }
+  .cat-new-row.open { display: flex; }
+  .cat-new-input {
+    flex: 1; background: rgba(200,160,60,0.06);
+    border: none; border-bottom: 1px solid var(--gold-dim);
+    color: var(--gold-text); font-family: var(--mono);
+    font-size: 10px; padding: 3px 6px; outline: none;
+  }
+  .cat-new-input::placeholder { color: var(--text-dim); }
+  .cat-new-ok {
+    background: rgba(200,160,60,0.15); border: 1px solid var(--gold-dim);
+    color: var(--gold); font-family: var(--mono); font-size: 9px;
+    padding: 3px 8px; border-radius: 3px; cursor: pointer;
+  }
+
+  /* Seznam položek */
+  .shop-list {
+    flex: 1; overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(200,160,60,0.2) transparent;
+    margin-bottom: 10px;
+  }
+
+  .shop-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 4px;
+    border-bottom: 1px solid rgba(200,160,60,0.07);
+    border-radius: 4px; position: relative;
+    transition: background 0.15s;
+  }
+  .shop-item:last-child { border-bottom: none; }
+  .shop-item:hover { background: rgba(200,160,60,0.04); }
+  .shop-item.on-sale { background: rgba(31,170,119,0.06); }
+
+  /* Priorita proužek */
+  .shop-bar {
+    width: 3px; align-self: stretch;
+    border-radius: 2px; flex-shrink: 0; min-height: 28px;
+  }
+  .priority-hned .shop-bar { background: var(--p-hned); }
+  .priority-pockat .shop-bar { background: var(--p-pockat); }
+
+  .shop-info { flex: 1; min-width: 0; }
+  .shop-name {
+    font-size: 11px; color: var(--gold-text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
+  .shop-item.on-sale .shop-name { color: var(--sleva); }
+
+  .shop-meta { display: flex; align-items: center; gap: 6px; }
+  .shop-target {
+    font-size: 9px; color: var(--text-dim); letter-spacing: 1px;
+  }
+  .shop-sale-badge {
+    font-size: 8px; background: rgba(31,170,119,0.2);
+    color: var(--sleva); padding: 1px 5px; border-radius: 4px;
+    letter-spacing: 1px; font-weight: 700;
+  }
+  .shop-priority-badge {
+    font-size: 8px; padding: 1px 5px; border-radius: 4px; letter-spacing: 1px;
+  }
+  .priority-hned .shop-priority-badge { background: rgba(224,48,32,0.15); color: var(--p-hned); }
+  .priority-pockat .shop-priority-badge { background: rgba(74,122,74,0.15); color: var(--p-pockat); }
+
+  .shop-actions {
+    display: flex; gap: 3px;
+    opacity: 0; transition: opacity 0.15s; flex-shrink: 0;
+  }
+  .shop-item:hover .shop-actions { opacity: 1; }
+  .shop-btn {
+    background: transparent; border: none; font-size: 10px;
+    cursor: pointer; color: var(--text-dim); padding: 2px 3px;
+    border-radius: 3px; transition: color 0.15s;
+  }
+  .shop-btn:hover { color: var(--gold); }
+  .shop-btn.del:hover { color: #c04040; }
+  .shop-btn.sale { font-size: 9px; }
+  .shop-btn.sale.active { color: var(--sleva); }
+
+  /* Edit inline */
+  .shop-edit-row {
+    display: none; padding: 6px 0 6px 13px;
+    gap: 6px; flex-wrap: wrap;
+    border-bottom: 1px solid rgba(200,160,60,0.08);
+  }
+  .shop-edit-row.open { display: flex; }
+  .shop-edit-input {
+    flex: 1; min-width: 120px;
+    background: rgba(200,160,60,0.06);
+    border: none; border-bottom: 1px solid var(--gold-dim);
+    color: var(--gold-text); font-family: var(--mono);
+    font-size: 10px; padding: 3px 6px; outline: none;
+  }
+  .shop-edit-price {
+    width: 80px; background: rgba(200,160,60,0.06);
+    border: 1px solid rgba(200,160,60,0.2); color: var(--gold-text);
+    font-family: var(--mono); font-size: 10px;
+    padding: 3px 5px; border-radius: 3px; outline: none;
+  }
+  .shop-edit-pri {
+    background: rgba(200,160,60,0.06);
+    border: 1px solid rgba(200,160,60,0.2); color: var(--gold-text);
+    font-family: var(--mono); font-size: 9px;
+    padding: 3px 5px; border-radius: 3px; cursor: pointer; outline: none;
+  }
+  .shop-edit-save {
+    background: rgba(200,160,60,0.15); border: 1px solid var(--gold-dim);
+    color: var(--gold); font-family: var(--mono); font-size: 9px;
+    padding: 3px 8px; border-radius: 3px; cursor: pointer;
+  }
+
+  /* Přidat položku */
+  .shop-add-section {
+    flex-shrink: 0;
+    border-top: 1px solid rgba(200,160,60,0.1);
+    padding-top: 10px;
+  }
+  .shop-add-toggle {
+    font-size: 8px; letter-spacing: 2px; color: var(--text-dim);
+    background: transparent; border: none; cursor: pointer;
+    text-transform: uppercase; display: flex; align-items: center; gap: 4px;
+    margin-bottom: 0;
+  }
+  .shop-add-toggle:hover { color: var(--gold); }
+  .shop-add-form { display: none; margin-top: 8px; flex-direction: column; gap: 6px; }
+  .shop-add-form.open { display: flex; }
+  .shop-add-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .shop-add-input {
+    flex: 1; min-width: 120px; background: transparent;
+    border: none; border-bottom: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text); font-family: var(--mono); font-size: 10px;
+    padding: 3px 4px; outline: none; transition: border-color 0.2s;
+  }
+  .shop-add-input:focus { border-color: var(--gold); }
+  .shop-add-input::placeholder { color: var(--text-dim); }
+  .shop-add-price {
+    width: 80px; background: transparent;
+    border: 1px solid rgba(200,160,60,0.2); color: var(--gold-text);
+    font-family: var(--mono); font-size: 10px;
+    padding: 3px 5px; border-radius: 3px; outline: none;
+  }
+  .shop-add-price::placeholder { color: var(--text-dim); }
+  .shop-add-pri {
+    background: transparent; border: 1px solid rgba(200,160,60,0.2);
+    color: var(--gold-text); font-family: var(--mono); font-size: 9px;
+    padding: 3px 5px; border-radius: 3px; cursor: pointer; outline: none;
+  }
+  .shop-add-btn {
+    background: rgba(200,160,60,0.12); border: 1px solid var(--gold-dim);
+    color: var(--gold); font-family: var(--mono); font-size: 11px;
+    padding: 3px 10px; border-radius: 4px; cursor: pointer;
+  }
+  .shop-add-btn:hover { background: rgba(200,160,60,0.22); }
+
+  .shop-empty { font-size: 10px; color: var(--text-dim); padding: 12px 0; letter-spacing: 1px; }
+  .cat-add-inline {
+    background: transparent; border: 1px dashed rgba(200,160,60,0.2);
+    color: var(--text-dim); font-size: 10px; width: 24px; height: 32px;
+    border-radius: 6px; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0; transition: all 0.15s;
+  }
+  .cat-add-inline:hover { border-color: var(--gold); color: var(--gold); }
+</style>
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+</head>
+<body>
+
+<div class="shop-card">
+  <div class="shop-header">
+    <div class="shop-label" data-i18n="shopping.title">Nákupy</div>
+    <div class="shop-total" id="shop-total">0 položek</div>
+  </div>
+
+  <!-- Kategorie slider -->
+  <div class="cat-slider">
+    <button class="cat-arrow" id="cat-prev">‹</button>
+    <div class="cat-current" id="cat-current">
+      <span class="cat-name" id="cat-name" data-i18n="common.all">Vše</span>
+      <span class="cat-count" id="cat-count">0</span>
+    </div>
+    <button class="cat-arrow" id="cat-next">›</button>
+    <button class="cat-add-inline" id="cat-add-inline" title="Přidat kategorii" data-i18n-title="common.addCategory">+</button>
+  </div>
+  <div class="cat-dots" id="cat-dots"></div>
+  <div class="cat-new-row" id="cat-new-row">
+    <input class="cat-new-input" id="cat-new-input" placeholder="název kategorie..." data-i18n-placeholder="common.categoryNamePlaceholder">
+    <button class="cat-new-ok" id="cat-new-ok">+ <span data-i18n="common.add">přidat</span></button>
+  </div>
+
+  <div class="shop-list" id="shop-list"></div>
+
+  <div class="shop-add-section">
+    <button class="shop-add-toggle" id="shop-add-toggle">
+      <span id="shop-add-arrow">▸</span> <span data-i18n="shopping.addItemToggle">přidat položku</span>
+    </button>
+    <div class="shop-add-form" id="shop-add-form">
+      <div class="shop-add-row">
+        <input class="shop-add-input" id="shop-add-name" placeholder="název položky..." data-i18n-placeholder="shopping.addItemPlaceholder">
+        <input class="shop-add-price" id="shop-add-price" type="number" placeholder="cíl Kč" data-i18n-placeholder="shopping.goalKc">
+        <select class="shop-add-pri" id="shop-add-pri">
+          <option value="pockat" data-i18n="shopping.priorityWaitOption">⏳ Počkat</option>
+          <option value="hned" data-i18n="shopping.priorityNowOption">🔴 Hned</option>
+        </select>
+        <button class="shop-add-btn" id="shop-add-btn">+</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'ks-shopping';
+
+const DEFAULT_CATS = [
+  { id: 'elektronika', name: 'Elektronika' },
+  { id: 'domacnost',   name: 'Domácnost' },
+  { id: 'obleceni',    name: 'Oblečení' },
+];
+
+let data = { categories: [], items: [] };
+let activeCatIdx = 0;
+
+// Výchozí kategorie mají pevný "id" (elektronika/domacnost/obleceni) a jejich
+// zobrazovaný název se překládá. Kategorie, které si uživatel přidá sám,
+// se nepřekládají (je to jeho vlastní text).
+const DEFAULT_CAT_LABEL_KEYS = {
+  elektronika: 'shopping.categories.electronics',
+  domacnost:   'shopping.categories.household',
+  obleceni:    'shopping.categories.clothing',
+};
+function catLabel(cat) {
+  const key = DEFAULT_CAT_LABEL_KEYS[cat.id];
+  return key ? ksT(key, cat.name) : cat.name;
+}
+
+function load() {
+  try { data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || { categories: [], items: [] }; }
+  catch { data = { categories: [], items: [] }; }
+  if (!data.categories.length) {
+    data.categories = DEFAULT_CATS;
+    data.items = [
+      { id: 'promo_ks', name: '🎉 Dashboard K-S Premium — kód: WELCOME10', cat: 'elektronika', targetPrice: 0, priority: 'pockat', onSale: true, url: 'https://dashboard-ks.com/premium' },
+    ];
+    save();
+  }
+}
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); try { localStorage.setItem('ks-mob-shopping', JSON.stringify({ count: data.items.length })); } catch {} }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── KATEGORIE ──
+function getCatList() { return [{ id: 'all', name: ksT('common.all', 'Vše') }, ...data.categories]; }
+
+function renderCats() {
+  const list = getCatList();
+  if (activeCatIdx >= list.length) activeCatIdx = 0;
+  const cur = list[activeCatIdx];
+  const count = cur.id === 'all' ? data.items.length : data.items.filter(i => i.cat === cur.id).length;
+
+  document.getElementById('cat-name').textContent = catLabel(cur);
+  document.getElementById('cat-count').textContent = count;
+  document.getElementById('cat-prev').disabled = false;
+  document.getElementById('cat-next').disabled = false;
+
+  // Tečky
+  document.getElementById('cat-dots').innerHTML = list.map((c,i) =>
+    `<div class="cat-dot ${i===activeCatIdx?'active':''}"></div>`).join('');
+
+  // Smazat tlačítko (ne pro Vše)
+  const curDiv = document.getElementById('cat-current');
+  let delBtn = curDiv.querySelector('.cat-del-btn');
+  if (delBtn) delBtn.remove();
+  if (cur.id !== 'all') {
+    delBtn = document.createElement('button');
+    delBtn.className = 'cat-del-btn';
+    delBtn.title = ksT('common.deleteCategory', 'Smazat kategorii');
+    delBtn.textContent = '✕';
+    delBtn.onclick = () => {
+      if (data.items.some(i => i.cat === cur.id)) {
+        if (!confirm(ksT('shopping.confirmDeleteCategory', 'Kategorie obsahuje položky — smazat?'))) return;
+        data.items = data.items.filter(i => i.cat !== cur.id);
+      }
+      data.categories = data.categories.filter(c => c.id !== cur.id);
+      activeCatIdx = 0;
+      save(); renderCats(); renderItems();
+    };
+    document.getElementById('cat-count').after(delBtn);
+  }
+
+  // Celkový počet
+  document.getElementById('shop-total').textContent = `${data.items.length} ${ksT('shopping.itemsCount', 'položek')}`;
+}
+
+document.getElementById('cat-prev').addEventListener('click', () => {
+  const list = getCatList();
+  activeCatIdx = (activeCatIdx - 1 + list.length) % list.length;
+  renderCats(); renderItems();
+});
+document.getElementById('cat-next').addEventListener('click', () => {
+  const list = getCatList();
+  activeCatIdx = (activeCatIdx + 1) % list.length;
+  renderCats(); renderItems();
+});
+
+document.getElementById('cat-add-inline').addEventListener('click', () => {
+  const row = document.getElementById('cat-new-row');
+  row.classList.toggle('open');
+  if (row.classList.contains('open')) document.getElementById('cat-new-input').focus();
+});
+
+document.getElementById('cat-new-ok').addEventListener('click', addCat);
+document.getElementById('cat-new-input').addEventListener('keydown', e => { if(e.key==='Enter') addCat(); });
+
+function addCat() {
+  const input = document.getElementById('cat-new-input');
+  const name = input.value.trim();
+  if (!name) return;
+  const id = 'cat_' + Date.now();
+  data.categories.push({ id, name });
+  input.value = '';
+  document.getElementById('cat-new-row').classList.remove('open');
+  save(); renderCats(); renderItems();
+}
+
+// ── POLOŽKY ──
+function renderItems() {
+  const list = document.getElementById('shop-list');
+  const cats = getCatList();
+  const cur  = cats[activeCatIdx];
+  let items  = cur.id === 'all' ? data.items : data.items.filter(i => i.cat === cur.id);
+
+  // Seřadit: hned nahoře, pak sleva
+  items = [...items].sort((a,b) => {
+    if (a.priority === 'hned' && b.priority !== 'hned') return -1;
+    if (b.priority === 'hned' && a.priority !== 'hned') return 1;
+    if (a.onSale && !b.onSale) return -1;
+    if (b.onSale && !a.onSale) return 1;
+    return 0;
+  });
+
+  if (!items.length) {
+    list.innerHTML = `<div class="shop-empty">${ksT('common.empty', '// žádné položky')}</div>`;
+    return;
+  }
+
+  list.innerHTML = items.map(item => `
+    <div class="shop-item priority-${item.priority} ${item.onSale?'on-sale':''}" data-id="${item.id}">
+      <div class="shop-bar"></div>
+      <div class="shop-info">
+        <div class="shop-name" ${item.url?`onclick="window.open('${item.url}','_blank','noopener')" style="cursor:pointer;"`:''}>${escHtml(item.name)}</div>
+        <div class="shop-meta">
+          ${item.targetPrice ? `<span class="shop-target">${ksT('shopping.goal', 'cíl:')} ${item.targetPrice.toLocaleString('cs-CZ')} ${ksT('common.kc', 'Kč')}</span>` : ''}
+          ${item.onSale ? `<span class="shop-sale-badge">✓ ${ksT('shopping.sale', 'SLEVA')}</span>` : ''}
+          <span class="shop-priority-badge">${item.priority === 'hned' ? ksT('shopping.priorityNowOption', '🔴 Hned') : ksT('shopping.priorityWaitOption', '⏳ Počkat')}</span>
+        </div>
+      </div>
+      <div class="shop-actions">
+        <button class="shop-btn sale ${item.onSale?'active':''}" data-sale="${item.id}" title="${item.onSale ? ksT('shopping.unmarkSale','Zrušit slevu') : ksT('shopping.markSale','Označit slevu')}">%</button>
+        <button class="shop-btn" data-edit="${item.id}">✎</button>
+        <button class="shop-btn del" data-del="${item.id}">✕</button>
+      </div>
+    </div>
+    <div class="shop-edit-row" id="edit-${item.id}">
+      <input class="shop-edit-input" id="edit-name-${item.id}" value="${escHtml(item.name)}">
+      <input class="shop-edit-price" type="number" id="edit-price-${item.id}" value="${item.targetPrice||''}">
+      <select class="shop-edit-pri" id="edit-pri-${item.id}">
+        <option value="pockat" ${item.priority==='pockat'?'selected':''}>${ksT('shopping.priorityWaitOption','⏳ Počkat')}</option>
+        <option value="hned"   ${item.priority==='hned'  ?'selected':''}>${ksT('shopping.priorityNowOption','🔴 Hned')}</option>
+      </select>
+      <button class="shop-edit-save" data-save="${item.id}">OK</button>
+    </div>
+  `).join('');
+
+  // Eventy
+  list.querySelectorAll('[data-edit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      list.querySelectorAll('.shop-edit-row.open').forEach(r => r.classList.remove('open'));
+      document.getElementById('edit-' + btn.dataset.edit)?.classList.add('open');
+    });
+  });
+  list.querySelectorAll('[data-save]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.save;
+      const item = data.items.find(i => i.id === id);
+      if (!item) return;
+      item.name = document.getElementById('edit-name-'+id)?.value.trim() || item.name;
+      item.targetPrice = parseFloat(document.getElementById('edit-price-'+id)?.value) || 0;
+      item.priority = document.getElementById('edit-pri-'+id)?.value || item.priority;
+      save(); renderCats(); renderItems();
+    });
+  });
+  list.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      data.items = data.items.filter(i => i.id !== btn.dataset.del);
+      save(); renderCats(); renderItems();
+    });
+  });
+  list.querySelectorAll('[data-sale]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = data.items.find(i => i.id === btn.dataset.sale);
+      if (item) { item.onSale = !item.onSale; save(); renderCats(); renderItems(); }
+    });
+  });
+}
+
+// ── PŘIDAT POLOŽKU ──
+document.getElementById('shop-add-toggle').addEventListener('click', () => {
+  const form  = document.getElementById('shop-add-form');
+  const arrow = document.getElementById('shop-add-arrow');
+  form.classList.toggle('open');
+  arrow.textContent = form.classList.contains('open') ? '▾' : '▸';
+});
+
+document.getElementById('shop-add-btn').addEventListener('click', addItem);
+document.getElementById('shop-add-name').addEventListener('keydown', e => { if(e.key==='Enter') addItem(); });
+
+function addItem() {
+  const name  = document.getElementById('shop-add-name').value.trim();
+  if (!name) return;
+  const price = parseFloat(document.getElementById('shop-add-price').value) || 0;
+  const pri   = document.getElementById('shop-add-pri').value;
+  const cats  = getCatList();
+  const cat   = cats[activeCatIdx].id === 'all' ? (data.categories[0]?.id || 'none') : cats[activeCatIdx].id;
+  data.items.push({ id: 'i_' + Date.now(), name, cat, targetPrice: price, priority: pri, onSale: false });
+  document.getElementById('shop-add-name').value = '';
+  document.getElementById('shop-add-price').value = '';
+  save(); renderCats(); renderItems();
+}
+
+// ── INIT ──
+load(); try { localStorage.setItem('ks-mob-shopping', JSON.stringify({ count: data.items.length })); } catch {} renderCats(); renderItems();
+
+// Když se přepne jazyk (v Nastavení nebo automaticky při načtení), překresli texty
+window.addEventListener('ks-lang-applied', () => { renderCats(); renderItems(); });
+</script>
+</body>
+</html>

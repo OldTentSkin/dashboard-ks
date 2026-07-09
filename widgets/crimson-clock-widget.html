@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard K-S — Hodiny (Crimson)</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #d34a4a;
+    --gold-dim: rgba(211,74,74,0.3);
+    --gold-text: #f0c0c0;
+    --text-dim: #6b3f3f;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: 100%; }
+  body {
+    height: 100%;
+    background: transparent;
+    font-family: var(--mono);
+    padding: 0; margin: 0;
+  }
+
+  .cr-card {
+    width: 100%; height: 100%;
+    border-radius: 18px;
+    position: relative;
+    border: 1px solid var(--gold-dim);
+    background: var(--card-bg, radial-gradient(ellipse at 0% 0%, #c82020 0%, #6a0a0a 30%, #1a0000 60%, #000000 100%));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    container-type: size;
+  }
+  .cr-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+    z-index: 2;
+  }
+  /* Jemná vinětace pro temnější dojem */
+  .cr-vignette {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%);
+    pointer-events: none; z-index: 1;
+  }
+
+  .cr-label {
+    position: absolute; top: 12px; left: 18px;
+    font-size: 9px; letter-spacing: 3px; color: var(--gold-text);
+    text-transform: uppercase; font-family: var(--sans);
+    font-weight: 600; text-shadow: 0 0 8px rgba(211,74,74,0.5);
+    z-index: 3;
+  }
+
+  .cr-content {
+    position: relative; z-index: 2;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 4px;
+    max-height: 100%;
+    min-height: 0;
+  }
+
+  canvas#cr-glass {
+    display: block;
+    width: auto;
+    height: 100%;
+    max-height: min(58cqh, 165px);
+    max-width: 100%;
+    aspect-ratio: 170 / 220;
+    object-fit: contain;
+  }
+  canvas#cr-glass.cr-flip {
+    animation: crFlip 0.7s cubic-bezier(0.4, 0.1, 0.2, 1);
+  }
+  @keyframes crFlip {
+    0%   { transform: rotate(0deg) scale(1); }
+    45%  { transform: rotate(170deg) scale(0.88); }
+    55%  { transform: rotate(190deg) scale(0.88); }
+    100% { transform: rotate(360deg) scale(1); }
+  }
+
+  .cr-time {
+    font-family: var(--mono);
+    font-size: clamp(20px, 9cqw, 30px);
+    font-weight: 700;
+    color: #ffb0b0;
+    text-shadow: 0 0 10px rgba(211,74,74,0.85), 0 0 22px rgba(180,20,20,0.5);
+    letter-spacing: 3px;
+  }
+  .cr-date {
+    font-size: 9px;
+    color: var(--gold-text);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.75;
+  }
+</style>
+</head>
+<body>
+
+<div class="cr-card">
+  <div class="cr-vignette"></div>
+  <div class="cr-label"><span data-i18n="clock.title">Hodiny</span></div>
+  <div class="cr-content">
+    <canvas id="cr-glass" width="170" height="220"></canvas>
+    <div class="cr-time" id="cr-time">--:--:--</div>
+    <div class="cr-date" id="cr-date">—</div>
+  </div>
+</div>
+
+<script src="theme-loader.js"></script>
+<script src="lang-loader.js"></script>
+<script>
+function DAYS(){return ksT('common.daysLower', ['neděle','pondělí','úterý','středa','čtvrtek','pátek','sobota']);}
+function MONTHS(){return ksT('common.months', ['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince']);}
+
+const canvas = document.getElementById('cr-glass');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+// Geometrie přesýpacích hodin
+const CX = W / 2;
+const FRAME_T = 12;          // tloušťka dřevěného rámu nahoře/dole
+const TOP_Y = FRAME_T + 10, NECK_Y = H / 2, BOT_Y = H - FRAME_T - 10;
+const BULB_W = 50, NECK_W = 4;
+
+// Padající zrnka (vizuální efekt proudění krčkem)
+let grains = [];
+function spawnGrain() {
+  grains.push({ x: CX + (Math.random()-0.5)*2, y: NECK_Y, vy: 1.4 + Math.random()*0.6, life: 1 });
+}
+
+// Zaoblený obrys skla — baňky jako organické křivky místo rovných trojúhelníků
+function hourglassPath() {
+  ctx.beginPath();
+  ctx.moveTo(CX - BULB_W, TOP_Y);
+  ctx.bezierCurveTo(CX - BULB_W, TOP_Y + 22, CX - NECK_W - 6, NECK_Y - 26, CX - NECK_W, NECK_Y);
+  ctx.bezierCurveTo(CX - NECK_W - 6, NECK_Y + 26, CX - BULB_W, BOT_Y - 22, CX - BULB_W, BOT_Y);
+  ctx.lineTo(CX + BULB_W, BOT_Y);
+  ctx.bezierCurveTo(CX + BULB_W, BOT_Y - 22, CX + NECK_W + 6, NECK_Y + 26, CX + NECK_W, NECK_Y);
+  ctx.bezierCurveTo(CX + NECK_W + 6, NECK_Y - 26, CX + BULB_W, TOP_Y + 22, CX + BULB_W, TOP_Y);
+  ctx.closePath();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y,     x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x,     y + h, r);
+  ctx.arcTo(x,     y + h, x,     y,     r);
+  ctx.arcTo(x,     y,     x + w, y,     r);
+  ctx.closePath();
+}
+
+function drawWoodBar(y, w) {
+  const x = CX - w/2;
+  const grad = ctx.createLinearGradient(0, y, 0, y + FRAME_T);
+  grad.addColorStop(0,   '#5a2418');
+  grad.addColorStop(0.45,'#7a3320');
+  grad.addColorStop(0.55,'#4a1d12');
+  grad.addColorStop(1,   '#2e0f0a');
+  ctx.save();
+  roundRect(x, y, w, FRAME_T, 5);
+  ctx.fillStyle = grad;
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+  ctx.fill();
+  ctx.restore();
+  // jemný lesk nahoře na liště
+  ctx.save();
+  roundRect(x+2, y+1.5, w-4, 2, 1);
+  ctx.fillStyle = 'rgba(255,180,150,0.18)';
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawPosts() {
+  // Boční sloupky spojující horní a dolní lištu (3D dřevěný rám)
+  [CX - BULB_W - 8, CX + BULB_W + 8 - 5].forEach(px => {
+    const grad = ctx.createLinearGradient(px, 0, px+5, 0);
+    grad.addColorStop(0,'#3a160e');
+    grad.addColorStop(0.5,'#6a2c1a');
+    grad.addColorStop(1,'#2a0f08');
+    ctx.fillStyle = grad;
+    roundRect(px, TOP_Y - 6, 5, BOT_Y - TOP_Y + 12, 2.5);
+    ctx.fill();
+  });
+}
+
+let lastMinute = new Date().getMinutes();
+function checkMinuteFlip() {
+  const now = new Date();
+  if (now.getMinutes() !== lastMinute) {
+    lastMinute = now.getMinutes();
+    canvas.classList.remove('cr-flip');
+    void canvas.offsetWidth; // restart animace
+    canvas.classList.add('cr-flip');
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  const now = new Date();
+  const progress = (now.getSeconds() * 1000 + now.getMilliseconds()) / 60000;
+
+  // ── Dřevěný rám (zadní vrstva) ──
+  drawPosts();
+  drawWoodBar(2, BULB_W * 2 + 26);
+  drawWoodBar(H - FRAME_T - 2, BULB_W * 2 + 26);
+
+  // ── Sklo — jemný vnitřní stín pro 3D dojem ──
+  ctx.save();
+  hourglassPath();
+  const glassGrad = ctx.createLinearGradient(CX - BULB_W, 0, CX + BULB_W, 0);
+  glassGrad.addColorStop(0,   'rgba(40,8,8,0.35)');
+  glassGrad.addColorStop(0.5, 'rgba(80,20,20,0.08)');
+  glassGrad.addColorStop(1,   'rgba(40,8,8,0.35)');
+  ctx.fillStyle = glassGrad;
+  ctx.fill();
+  ctx.restore();
+
+  // ── Ořez podle tvaru skla pro vykreslení písku ──
+  ctx.save();
+  hourglassPath();
+  ctx.clip();
+
+  const topSandH = (BULB_W) * (1 - progress);
+  if (topSandH > 1) {
+    const topTopY = NECK_Y - topSandH * 1.55;
+    ctx.fillStyle = '#8a1010';
+    ctx.beginPath();
+    ctx.moveTo(CX - BULB_W * (1-progress) * 0.96, Math.max(TOP_Y, topTopY));
+    ctx.lineTo(CX + BULB_W * (1-progress) * 0.96, Math.max(TOP_Y, topTopY));
+    ctx.lineTo(CX + NECK_W, NECK_Y);
+    ctx.lineTo(CX - NECK_W, NECK_Y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const botSandH = (BOT_Y - NECK_Y - 6) * progress;
+  if (botSandH > 1) {
+    const peakY = BOT_Y - botSandH;
+    const spread = Math.min(BULB_W * 0.96, botSandH * 1.25 + 4);
+    ctx.fillStyle = '#a81818';
+    ctx.beginPath();
+    ctx.moveTo(CX, peakY);
+    ctx.lineTo(CX + spread, BOT_Y);
+    ctx.lineTo(CX - spread, BOT_Y);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // ── Padající zrnka v krčku ──
+  if (Math.random() < 0.7) spawnGrain();
+  ctx.save();
+  hourglassPath();
+  ctx.clip();
+  grains.forEach(g => { g.y += g.vy; g.life -= 0.012; });
+  grains = grains.filter(g => g.life > 0 && g.y < BOT_Y);
+  grains.forEach(g => {
+    ctx.fillStyle = `rgba(255,120,120,${g.life})`;
+    ctx.fillRect(g.x, g.y, 1.4, 3);
+  });
+  ctx.restore();
+
+  // ── Sklo — obrys + jemný lesk (3D efekt) ──
+  ctx.save();
+  hourglassPath();
+  ctx.strokeStyle = 'rgba(211,74,74,0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = 'rgba(211,74,74,0.5)';
+  ctx.shadowBlur = 9;
+  ctx.stroke();
+  ctx.restore();
+
+  // Lesklý pruh vlevo na skle (simuluje odlesk)
+  ctx.save();
+  hourglassPath();
+  ctx.clip();
+  const sheen = ctx.createLinearGradient(CX - BULB_W*0.7, 0, CX - BULB_W*0.3, 0);
+  sheen.addColorStop(0, 'rgba(255,255,255,0.16)');
+  sheen.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sheen;
+  ctx.fillRect(CX - BULB_W, TOP_Y, BULB_W*0.5, BOT_Y - TOP_Y);
+  ctx.restore();
+
+  // ── Záblesk u krčku ──
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,160,160,0.5)';
+  ctx.shadowColor = 'rgba(211,74,74,0.8)';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(CX, NECK_Y, 2, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function tick() {
+  const now = new Date();
+  document.getElementById('cr-time').textContent =
+    String(now.getHours()).padStart(2,'0') + ':' +
+    String(now.getMinutes()).padStart(2,'0') + ':' +
+    String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('cr-date').textContent =
+    `${DAYS()[now.getDay()]}, ${now.getDate()}. ${MONTHS()[now.getMonth()]}`;
+}
+
+tick();
+setInterval(tick, 1000);
+setInterval(() => { checkMinuteFlip(); draw(); }, 50);
+draw();
+window.addEventListener('ks-lang-applied', tick);
+</script>
+</body>
+</html>
