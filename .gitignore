@@ -1,0 +1,15 @@
+# Citlivé soubory - nikdy nepatří do veřejného repozitáře!
+# (obsahují tajné klíče, reálné licenční kódy nebo jinak citlivá data)
+
+check-code.php
+theme-paypal-ipn.php
+stripe-webhook.php
+licenses.json
+
+# Log soubory (mohou obsahovat IP adresy, e-maily apod.)
+*.log
+theme-paypal-ipn.log
+
+# Systémové/pomocné soubory
+desktop.ini
+.DS_Store
